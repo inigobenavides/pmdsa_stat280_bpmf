@@ -1,0 +1,576 @@
+---
+title: "STAT 280 Project Netflix Bayesian Probabilistic Matrix Factorization"
+author: "Inigo Benavides"
+date: "11/3/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library("tidyverse")
+library("DBI")
+library("RSQLite")
+library("feather")
+library("mvtnorm")
+```
+
+# Bayesian Probabilistic Matrix Factorization
+
+In this project, we implement a Gibbs sampler to generate recommendations for Netflix user ratings on movies, based on the Movielens data set.
+
+```{r eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+# ETL csv to feather
+files_to_convert <- c("movie", "link", "tag", "genome_scores", "genome_tags", "rating")
+path <- "/home/rstudio/data/movielens"
+
+for (file in files_to_convert) {
+  # Read CSV
+  csv_path <- path %>% paste(file, sep="/") %>% paste(".csv", sep="")
+  csv_file <- read_csv(csv_path)
+  
+  # Write feather
+  feather_path <- path %>% paste(file, sep="/") %>% paste(".feather", sep="")
+  feather::write_feather(csv_file, feather_path)
+}
+```
+
+## Exploratory Data Analysis
+
+```{r cache=TRUE}
+# Load ratings
+ratings <- read_feather("/home/rstudio/data/movielens/rating.feather")
+ratings %>% head
+```
+
+```{r cache=TRUE}
+# Summarise ratings
+ratings %>% summarise(nrows=n(),
+                      ndistinct_users=n_distinct(userId),
+                      ndistinct_movies=n_distinct(movieId),
+                      min_date=min(timestamp),
+                      max_date=max(timestamp),
+                      min_rating=min(rating),
+                      mean_rating=mean(rating),
+                      max_rating=max(rating))
+```
+
+
+
+```{r}
+# Load movies
+movies <- read_feather("/home/rstudio/data/movielens/movie.feather")
+movies %>% head
+```
+
+
+```{r}
+# Top 100 Movies by mean ratings with at least 1000 
+ratings %>%
+  group_by(movieId) %>%
+  summarise(mean_rating=mean(rating), count=n()) %>% 
+  filter(count > 1000) %>% 
+  arrange(desc(mean_rating)) %>% 
+  head(100) %>% 
+  left_join(movies, by=c("movieId")) %>% 
+  select(title, mean_rating, count)
+```
+
+
+```{r}
+ratings %>%
+  group_by(movieId) %>%
+  summarise(mean_rating=mean(rating), count=n()) %>% 
+  sample_n(2000) %>% 
+  ggplot(aes(x=log10(count), y=mean_rating)) + geom_point() + geom_smooth() + theme_minimal()
+```
+
+## Model
+
+In this section, we specify the model for Bayesian Probalistic Matrix Factorization (Salakhutdinov and Minh, 2008) as follows:
+
+We assume that each movie rating $r_{ij}$ made by user $i \in \{1,\cdots, N\}$ for movie $j \in \{1,\cdots, M\}$ is normally distributed with mean as a linear combination of a $k$-rank latent user vector $U_i$ and latent movie vector $V_j$, whose elements are Gaussian distributed; as well as with precision $\alpha$.
+
+$$
+p(R|U, V, \alpha) = \prod_{i=1}^{N} \prod_{j=1}^M \left[\mathcal{N}(R_{ij} \mid U_i^TV_j, \alpha^{-1})\right]^{I_{ij}}
+$$
+where $I_{ij}$ is the indicator variable equal to 1 if user $i$ rated movie $j$, and 0 otherwise. We place Gaussian priors on the elements of each latent feature vector for users and movies with hyperparameters $\mu_{U}, \Lambda_{U}$ and $\mu_{V}, \Lambda_{V}$:
+$$
+p(U \mid \mu_{U}, \Lambda_{U}) = \prod_{i=1}^{N} \mathcal{N}(U_{i} \mid \mu_{U}, \Lambda_{U}^{-1})
+$$
+
+and 
+
+$$
+p(V \mid \mu_{V}, \Lambda_{V}) = \prod_{j=1}^{M} \mathcal{N}(V_{j} \mid \mu_{V}, \Lambda_{V}^{-1})
+$$
+
+Here $U_i$ defines is a vector of length $k$ that represents an embedding of a user $i$, while $V_j$ similarly defines a vector of length $k$ that represents an embedding of a movie $j$. 
+
+We further place Gaussian-Wishart priors on $\mu_{U}, \Lambda_{U}$ and $\mu_{V}, \Lambda_{V}$:
+
+$$
+p(\mu_{U}, \Lambda_{U} \mid \mu_{0}, \Lambda_{0}) = p(\mu_{U} \mid \Lambda_{U}) p(\Lambda_{U}) = \mathcal{N}(\mu_{U} \mid \mu_{0}, (\beta_0\Lambda_{U})^{-1}) \mathcal{W}(\Lambda_{U}|W_0, \nu_0)
+$$
+$$
+p(\mu_{V}, \Lambda_{V} \mid \mu_{0}, \Lambda_{0}) = p(\mu_{U} \mid \Lambda_{V}) p(\Lambda_{V}) = \mathcal{N}(\mu_{V} \mid \mu_{0}, (\beta_0\Lambda_{V})^{-1}) \mathcal{W}(\Lambda_{V}|W_0, \nu_0)
+$$
+
+where $\mathcal{W}$ is the Wishart distribution with $\nu_0$ degrees of freedom and a $k$ x  $k$ scale matrix $W_0$:
+
+$$
+\mathcal{W \mid W_0, \nu_0} \propto |\Lambda|^{(\nu_0-D-1)/2} \exp{(\frac{1}{2}\text{Tr}(W_0^{-1}\Lambda))}
+$$
+
+This distribution is a multivariate generalization of the gamma distribution.
+
+## Methodology
+
+By specifying the model using conjugate priors, we can analytically compute the posterior conditional distributions, which we can then use with Gibbs sampling. Thus, the conditional distribution for $U_i$ is:
+
+$$
+p(U_i \mid R, V, \mu_U, \Lambda_U, \alpha) = \mathcal{N}(U_i \mid \mu_i^{*}, [\Lambda_i^{*}]^{-1})
+$$
+where,
+$$
+\Lambda_{i}^{*} = \Lambda_U + \alpha \sum_{j=1}^{M}{[V_jV_j^T]^{I_{ij}}}
+$$
+and
+$$
+\mu_i^{*} = [\Lambda_{i}^{*}]^{-1} \left(\alpha \sum_{j=1}^{M} {[V_jR_{ij}]^{I_{ij}}} + \Lambda_U \mu_U \right)
+$$
+
+Since each user vector $U_i$ is assumed independent, it follows that:
+
+$$
+p(U \mid R, V, \mu_U, \Lambda_U) = \prod_{i=1}^{N} {p(U_i \mid R, V, \mu_U, \Lambda_U, \alpha)}
+$$
+
+By similar reasoning, we can derive the conditional distribution for $V_j$:
+
+$$
+p(V_j \mid R, U, \mu_V, \Lambda_V, \alpha) = \mathcal{N}(V_j \mid \mu_j^{*}, [\Lambda_j^{*}]^{-1})
+$$
+where,
+$$
+\Lambda_{j}^{*} = \Lambda_V + \alpha \sum_{i=1}^{N}{[U_iU_i^T]^{I_{ij}}}
+$$
+and
+$$
+\mu_j^{*} = [\Lambda_{j}^{*}]^{-1} \left(\alpha \sum_{i=1}^{N} {[U_iR_{ij}]^{I_{ij}}} + \Lambda_V \mu_V \right)
+$$
+
+Lastly, we derive the conditional distribution for the hyperparameters $\mu_{U}, \Lambda_{U}$ and $\mu_{V}, \Lambda_{V}$:
+
+$$
+p(\mu_{U}, \Lambda_{U} \mid U, \mu_0, \Lambda_0) = \mathcal{N}(\mu_U \mid \mu_0^{*}, (\beta_0^*\Lambda_U)^{-1}) \mathcal{W}(\Lambda_U \mid W_0^*, \nu_0^*)
+$$
+
+where,
+
+$$
+\begin{aligned}
+u_0^* = \frac{\beta_0\mu_0 + N\bar{U}}{\beta_0+N} \\
+\beta_0^* = \beta_0 + N \\
+\nu_0^* = \nu_0 + N \\
+[W_0^*]^{-1} = W_0^{-1} + N\bar{S} + \frac{\beta_0N}{\beta_0 + N}(\mu_0 - \bar{U})(\mu_0 - \bar{U})^T
+\end{aligned}
+$$
+
+where the sample mean and variances are given by:
+
+$$
+\begin{aligned}
+\bar{U} = \frac{1}{N} \sum_{i=1}^{N}{U_i} \\
+\bar{S} = \frac{1}{N} \sum_{i=1}^{N}{U_iU_i^T}
+\end{aligned}
+$$
+
+We can similarly solve for the conditional posterior distributions for $\mu_{V}, \Lambda_{V}$, following the above form.
+
+### Gibbs Sampler Algorithm
+
+Since we have specified the conditional distribution of the parameters hyperparameters, we can apply Gibbs sampling as follows:
+
+1. Initialize model parameters ${U^{1}, V^{1}}$
+
+2. For $t=1,\cdots,T$ iterations:
+
+a.) Sample hyperparameters $\mu_U^{(t)}, \Lambda_U^{(t)} \sim p(\mu_U, \Lambda_U \mid U^{(t)}, \mu_0, \Lambda_0)$ and $\mu_V^{(t)}, \Lambda_V^{(t)} \sim p(\mu_V, \Lambda_V \mid V^{(t)}, \mu_0, \Lambda_0)$
+
+b.) For each $i = 1, \cdots, N$, sample user features in parallel $U_i^{(t+1)} \sim p(U_i \mid R, V^{(t)}, \mu_U^{(t)}, \Lambda_U^{(t)})$
+
+c.) For each $j = 1, \cdots, M$, sample movie features in parallel $V_j^{(t+1)} \sim p(V_j \mid R, U^{(t+1)}, \mu_V^{(t)}, \Lambda_V^{(t)})$
+
+## Experiment on Synthetic Data
+
+```{r}
+# Generate synthetic ratings matrix
+k <- 3
+n_users <- 5
+n_movies <- 5
+U_synthetic <- 1:n_users %>% Map(function(x) {
+    sampled_covariance <- rWishart(1, k, diag(k))[,,1]
+    rmvnorm(1, mean=rep(0, k), sigma=sampled_covariance)
+  }, .) %>% Reduce(function(x, y){
+    rbind(x, y)
+  }, .)
+
+V_synthetic <- 1:n_movies %>% Map(function(x) {
+    sampled_covariance <- rWishart(1, k, diag(k))[,,1]
+    rmvnorm(1, mean=rep(0, k), sigma=sampled_covariance)
+  }, .) %>% Reduce(function(x, y){
+    rbind(x, y)
+  }, .)
+
+R_synthetic <- U_synthetic %*% t(V_synthetic)
+```
+
+```{r}
+R_synthetic
+```
+
+
+```{r}
+# Randomly nk sample entries from synthetic ratings matrix
+# For every row, sample at least 3 ratings
+sparse_observations <- c()
+for (i in 1:n_users) {
+  index_sample <- sample(1:n_movies, size=2)
+  for (j in index_sample) {
+    sampled_tuple <- c(i, j, R_synthetic[i, j]) %>% as.matrix() %>% t
+    sparse_observations <- rbind(sparse_observations, sampled_tuple)
+  }
+}
+sparse_observations
+```
+
+
+```{r}
+# Top-level functions to iterate per Gibbs sample
+# 1. sample_theta_U
+# 2. sample_theta_V
+# 3. sample_U
+# 4. sample_V
+
+# Define helper functions to re-use for U and V
+compute_U_bar <- function(latent_matrix, N) {
+  U_bar <- colSums(latent_matrix) / N
+  return(U_bar)
+}
+
+compute_S_bar <- function(latent_matrix, N) {
+  S_bar <- (t(latent_matrix) %*% latent_matrix) / N
+  return(S_bar)
+}
+
+compute_mu_0_star <- function(beta_0_prev, mu_0_prev, latent_matrix, N) {
+  return((beta_0_prev * mu_0_prev + N * compute_U_bar(latent_matrix, N)) / (beta_0_prev + N))
+}
+
+compute_beta_0_star <- function(beta_0_prev, N) {
+  return(beta_0_prev + N)
+}
+
+compute_nu_0_star <- function(nu_0_prev, N) {
+  return(nu_0_prev + N)
+} 
+
+compute_W_0_star <- function(W_0, latent_matrix, N, mu_0_prev, beta_0_prev) {
+  W_0_inv <- solve(W_0)
+  S_bar <- compute_S_bar(latent_matrix, N)
+  U_bar <- compute_U_bar(latent_matrix, N)
+  W_0_star_inv <- (W_0_inv + N * S_bar + ((beta_0 * N) / (beta_0 + N)) * ((mu_0_prev - U_bar) %*% t(mu_0_prev - U_bar)))
+  W_0_star <- solve(W_0_star_inv)
+  return(W_0_star)
+}
+
+# Define theta_U sampler
+sample_theta_U <- function(U_prev, mu_0_prev, beta_0_prev, nu_0_prev, W_0_prev, n_users) {
+  # @param U_prev: Matrix[n_users: Integer, k: Integer]
+  # @param mu_0_prev: Matrix[n_users: Integer, 1]
+  # @param beta_0_prev: Scalar: Integer
+  # @param nu_0_prev: Scalar: Integer
+  # @param W_0_prev: Matrix[k: Integer, k: Integer]
+  # @param n_users: Scalar: Integer
+  # @return tuple(mu_U, Lambda_U)
+  
+  nu_0_star_U <- compute_nu_0_star(nu_0_prev, n_users)
+  W_star_U <- compute_W_0_star(W_0_prev, U_prev, n_users, mu_0_prev, beta_0_prev)
+  mu_star_U <- compute_mu_0_star(beta_0_prev, mu_0_prev, U_prev, n_users)
+  
+  Lambda_U <- rWishart(1, nu_0_star_U, W_star_U)[,,1]
+  mu_U <- rmvnorm(1, mu_star_U, Lambda_U)
+  return(list(mu_U, Lambda_U))
+}
+
+# Define theta_V sampler
+sample_theta_V <- function(V_prev, mu_0_prev, beta_0_prev, nu_0_prev, W_0_prev, n_movies) {
+  # @param V_prev: Matrix[n_movies: Integer, k: Integer]
+  # @param mu_0_prev: Matrix[n_users: Integer, 1]
+  # @param beta_0_prev: Scalar: Integer
+  # @param nu_0_prev: Scalar: Integer
+  # @param W_0_prev: Matrix[k: Integer, k: Integer]
+  # @param n_movies: Scalar: Integer
+  # @return tuple(mu_V, Lambda_V)
+  
+  nu_0_star_V <- compute_nu_0_star(nu_0_prev, n_movies)
+  W_star_V <- compute_W_0_star(W_0_prev, V_prev, n_movies, mu_0_prev, beta_0_prev)
+  mu_star_V <- compute_mu_0_star(beta_0_prev, mu_0_prev, V_prev, n_movies)
+  
+  Lambda_V <- rWishart(1, nu_0_star_V, W_star_V)[,,1]
+  mu_V <- rmvnorm(1, mu_star_V, Lambda_V)
+  return(list(mu_V, Lambda_V))
+}
+```
+
+```{r}
+# Define helper function to retrieve movie observation mask
+extract_user_observation_index <- function(R, user_index) {
+  # @param R: Sparse Matrix
+  # @param user_index: Integer
+  # @return tuple(observations)
+  return(R[R[,1] == user_index, 2])
+}
+
+extract_user_observation_ratings <- function(R, user_index) {
+  # @param R: Sparse Matrix
+  # @param user_index: Integer
+  # @return tuple(observations)
+  return(R[R[,1] == user_index, 3])
+}
+
+
+# Define function to sample from U_i
+sample_U_i <- function(R, mu_U, Lambda_U, V, alpha, user_index, k) {
+  # @param R: Sparse Matrix[user_index, movie_index, rating]
+  # @param mu_U: Scalar
+  # @param Lambda_U: Matrix[k, k]
+  # @return U_i: Matrix[1, k]
+  user_observation_mask <- extract_user_observation_index(R, user_index)
+  user_ratings <- extract_user_observation_ratings(R, user_index)
+  num_unobserved <- nrow(V) - length(user_observation_mask)
+  V_observed <- V[user_observation_mask,]
+  Lambda_i_star <- (Lambda_U + alpha * ((t(V_observed) %*% (V_observed)) + num_unobserved * diag(k)))
+   
+  mu_i_star <- (solve(Lambda_i_star) %*% (alpha * (t(V_observed) %*% as.matrix(user_ratings) + num_unobserved * as.matrix(rep(1, k))) + t(mu_U %*% Lambda_U)))
+  
+  U_i_sampled <- rmvnorm(1, mu_i_star, solve(Lambda_i_star))
+  return(U_i_sampled)
+}
+
+# Define function to construct U from sampled U_i
+sample_U <- function(R, mu_U, Lambda_U, V, alpha, k, n_users) {
+  # @param R: Sparse Matrix[user_index, movie_index, rating]
+  # @param mu_U: Scalar
+  # @param Lambda_U: Matrix[k x k]
+  # @param V: Matrix[n_users, k]
+  # @param alpha: Scalar
+  # @param k: Scalar
+  # @param n_users: Scalar
+  sampled_U <- c()
+  for (i in 1:n_users) {
+    u_i <- sample_U_i(R, mu_U, Lambda_U, V, alpha, i, k)
+    sampled_U <- rbind(sampled_U, u_i)
+  }
+  return(sampled_U)
+}
+
+```
+
+```{r}
+# Define helper function to retrieve user observation mask
+extract_movie_observation_index <- function(R, movie_index) {
+  # @param R: Sparse Matrix
+  # @param movie_index: Integer
+  # @return tuple(observations)
+  return(R[R[,2] == movie_index, 1])
+}
+
+extract_movie_observation_ratings <- function(R, movie_index) {
+  # @param R: Sparse Matrix
+  # @param user_index: Integer
+  # @return tuple(observations)
+  return(R[R[,2] == movie_index, 3])
+}
+
+
+# Define function to sample from U_i
+sample_V_i <- function(R, mu_V, Lambda_V, U, alpha, movie_index, k) {
+  # @param R: Sparse Matrix[user_index, movie_index, rating]
+  # @param mu_V: Scalar
+  # @param Lambda_V: Matrix[k, k]
+  # @return V_i: Matrix[1, k]
+  movie_observation_mask <- extract_movie_observation_index(R, movie_index)
+  movie_ratings <- extract_movie_observation_ratings(R, movie_index)
+  num_unobserved <- nrow(U) - length(movie_observation_mask)
+  U_observed <- U[movie_observation_mask,]
+  Lambda_i_star <- (Lambda_V + alpha * ((t(U_observed) %*% (U_observed)) + num_unobserved * diag(k)))
+  
+  mu_i_star <- (solve(Lambda_i_star) %*% (alpha * (t(U_observed) %*% as.matrix(movie_ratings) + num_unobserved * as.matrix(rep(1, k))) + t(mu_V %*% Lambda_V)))
+  
+  V_i_sampled <- rmvnorm(1, mu_i_star, solve(Lambda_i_star))
+  return(V_i_sampled)
+}
+
+# Define function to construct U from sampled U_i
+sample_V <- function(R, mu_V, Lambda_V, U, alpha, k, n_movies) {
+  # @param R: Sparse Matrix[user_index, movie_index, rating]
+  # @param mu_V: Scalar
+  # @param Lambda_V: Matrix[k x k]
+  # @param U: Matrix[n_movies, k]
+  # @param alpha: Scalar
+  # @param k: Scalar
+  # @param n_movies: Scalar
+  sampled_V <- c()
+  for (i in 1:n_movies) {
+    v_i <- sample_V_i(R, mu_V, Lambda_V, U, alpha, i, k)
+    sampled_V <- rbind(sampled_V, v_i)
+  }
+  return(sampled_V)
+}
+```
+
+```{r}
+# Initialize U and V
+k_estimate <- 5
+alpha <- 10
+U_init <- 1:n_users %>% Map(function(x) {
+    sampled_covariance <- rWishart(1, k_estimate, diag(k_estimate))[,,1]
+    rmvnorm(1, mean=rep(0, k_estimate), sigma=sampled_covariance)
+  }, .) %>% Reduce(function(x, y){
+    rbind(x, y)
+  }, .)
+
+V_init <- 1:n_movies %>% Map(function(x) {
+    sampled_covariance <- rWishart(1, k_estimate, diag(k_estimate))[,,1]
+    rmvnorm(1, mean=rep(0, k_estimate), sigma=sampled_covariance)
+  }, .) %>% Reduce(function(x, y){
+    rbind(x, y)
+  }, .)
+
+```
+
+```{r}
+# Implement Gibbs sampler
+n_replications <- 1000
+
+# Define initial parameters
+mu_0 <- rep(0, k_estimate)
+beta_0 <- 1
+nu_0 <- 1
+W_0 <- diag(k_estimate)
+
+U_current <- U_init
+V_current <- V_init
+mu_Us <- list()
+mu_Vs <- list()
+Lambda_Us <- list()
+Lambda_Vs <- list()
+Rs <- list()
+Us <- list()
+Vs <- list()
+
+# Run Gibbs Sampler
+for (i in 1:n_replications) {
+  # Update U and V
+  U_prev <- U_current
+  V_prev <- V_current
+  
+  # Sample theta U
+  sampled_theta_U <- sample_theta_U(U_prev, mu_0, beta_0, nu_0, W_0, n_users)
+  sampled_mean_U <- sampled_theta_U[[1]]
+  sampled_Lambda_U <- sampled_theta_U[[2]]
+  
+  # Sample theta V
+  sampled_theta_V <- sample_theta_V(V_prev, mu_0, beta_0, nu_0, W_0, n_movies)
+  sampled_mean_V <- sampled_theta_V[[1]]
+  sampled_Lambda_V <- sampled_theta_V[[2]]
+  
+  # Sample U
+  U_current <- sample_U(sparse_observations, sampled_mean_U, sampled_Lambda_U, V_prev, alpha, k_estimate, n_users)
+  
+  # Sample V
+  V_current <- sample_V(sparse_observations, sampled_mean_V, sampled_Lambda_V, U_current, alpha, k_estimate, n_movies)
+  
+  # Compute mean ratings
+  R_current_means <- U_current %*% t(V_current)
+  
+  # Draw from normal with precision 1/alpha
+  R_current <- structure(vapply(R_current_means,
+                                function(x) {rnorm(1, mean=x, sd=1/alpha)},
+                                numeric(1)),
+                         dim=dim(R_current_means))
+
+  # Collect replication samples
+  mu_Us[[i]] <- sampled_mean_U
+  mu_Vs[[i]] <- sampled_mean_V
+  Lambda_Us[[i]] <- sampled_Lambda_U
+  Lambda_Vs[[i]] <- sampled_Lambda_V
+  
+  Us[[i]] <- U_current
+  Vs[[i]] <- V_current
+  Rs[[i]] <- R_current
+  
+}
+```
+
+
+
+
+```{r}
+sparse_observations %>%
+  as.data.frame %>%
+  rename(user=V1, movie=V2, rating=V3) %>% 
+  group_by(movie) %>% summarise(n=n(), mean_rating=mean(rating), sd_rating=sd(rating)) %>% 
+  arrange(desc(n)) %>% head
+```
+
+
+```{r}
+sparse_observations %>% 
+  as.data.frame() %>% 
+  ggplot() +
+  geom_tile(
+    mapping = aes(x = V1, y = V2, fill = V3)
+  ) + 
+  geom_text(
+    mapping = aes(x = V1, y = V2, label = round(V3,2))
+  )
+```
+
+
+```{r}
+index_i <- 3
+index_j <- 3
+xs <- 500:n_replications
+sampled_rs <- xs %>% Map(function(x) {Rs[[x]][index_i,index_j]}, .) %>% unlist
+posterior_rs_mean <- mean(sampled_rs)
+data.frame(
+  x=xs,
+  y=sampled_rs
+  ) %>% ggplot(aes(x=y)) + geom_density() + theme_minimal() + geom_vline(xintercept=posterior_rs_mean) + geom_vline(xintercept=R_synthetic[index_i, index_j], color='red') + labs(title=posterior_rs_mean)
+```
+
+
+```{r}
+# TODO
+## Synthetic Data - Gaussian
+# - Iterate code for each observation to sample U [X]
+# - Replicate for sampling from V [X]
+# - Implement Gibbs sampling replications [X]
+# - Compare predictions with true values [X]
+# - Estimate RMSE
+# - Inspect model confidence intervals
+# - Documentation
+# 
+## Netflix Data - Sample
+# - Sample methodology - train-test-split
+# - Run BPMF and benchmark runtime performance (how long do we need to run this for the full data set?)
+# - Estimate test-sample RMSE
+# - Inspect model confidence intervals
+# - Documentation
+# 
+## Netflix Data - Full scale
+# - Figure out how to parallelize
+# - Presentation mode
+```
+
