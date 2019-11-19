@@ -210,8 +210,8 @@ c.) For each $j = 1, \cdots, M$, sample movie features in parallel $V_j^{(t+1)} 
 ```{r}
 # Generate synthetic ratings matrix
 k <- 3
-n_users <- 4
-n_movies <- 5
+n_users <- 5
+n_movies <- 40
 U_synthetic <- 1:n_users %>% Map(function(x) {
     sampled_covariance <- rWishart(1, k, diag(k))[,,1]
     rmvnorm(1, mean=rep(0, k), sigma=sampled_covariance)
@@ -232,7 +232,7 @@ R_synthetic
 R_synthetic %>% 
   matrix_to_tidydf() %>% 
   vis_matrix(row_col = 'row', column_col = 'col',
-             value_col = 'value') + 
+             value_col = 'value', label = FALSE) + 
   labs(y = 'Users', x = 'Movies')
 ```
 
@@ -242,7 +242,7 @@ R_synthetic %>%
 # For every row, sample at least 3 ratings
 sparse_observations <- c()
 for (i in 1:n_users) {
-  index_sample <- sample(1:n_movies, size=2)
+  index_sample <- sample(1:n_movies, size = sample(1:n_movies, 1))
   for (j in index_sample) {
     sampled_tuple <- c(i, j, R_synthetic[i, j]) %>% as.matrix() %>% t
     sparse_observations <- rbind(sparse_observations, sampled_tuple)
@@ -250,7 +250,7 @@ for (i in 1:n_users) {
 }
 sparse_observations %>% 
   vis_matrix(row_col = "V1", column_col = "V2",
-             value_col = "V3") +
+             value_col = "V3", label = FALSE) +
   labs(y = 'Users', x = 'Movies')
 ```
 
@@ -280,15 +280,40 @@ simulation_results <- BPMF_Gibbs_Sampler(
 ```
 
 ```{r}
-index_i <- 4
-index_j <- 3
-xs <- 500:n_replications
-sampled_rs <- xs %>% Map(function(x) {simulation_results$Rs[[x]][index_i,index_j]}, .) %>% unlist
-posterior_rs_mean <- mean(sampled_rs)
-data.frame(
-  x=xs,
-  y=sampled_rs
-  ) %>% ggplot(aes(x=y)) + geom_density() + theme_minimal() + geom_vline(xintercept=posterior_rs_mean) + geom_vline(xintercept=R_synthetic[index_i, index_j], color='red') + labs(title=posterior_rs_mean)
+map_df(
+  1:n_users,
+  function(user_index) {
+    extract_simulated_ratings(simulation_results,
+                              user_index = user_index, 
+                              movie_index = 17) %>% 
+      mutate(user_index = user_index)
+  }
+) %>% 
+  ggplot() +
+  geom_boxplot(
+    mapping = aes(x = user_index,
+                  y = simulated_rating,
+                  group = user_index)
+  ) +
+  geom_label(
+    data = function(data) {
+      data %>% 
+        group_by(user_index) %>% 
+        summarise(median_rating = median(simulated_rating)) %>% 
+        ungroup() %>% 
+        mutate(num_ratings = sapply(
+          user_index,
+          function(x) {
+            count_user_ratings(sparse_observations, x)
+          }
+        ))
+    },
+    mapping = aes(
+      x = user_index, y = median_rating,
+      label = num_ratings
+    )
+  )
+
 ```
 
 
