@@ -11,6 +11,11 @@ library("DBI")
 library("RSQLite")
 library("feather")
 library("mvtnorm")
+library("glue")
+source("code/visualisations.R")
+source("code/utils.R")
+source("code/bpmf_utils.R")
+source("code/bpmf_gibbs_sampler.R")
 ```
 
 # Bayesian Probabilistic Matrix Factorization
@@ -223,6 +228,12 @@ V_synthetic <- 1:n_movies %>% Map(function(x) {
 
 R_synthetic <- U_synthetic %*% t(V_synthetic)
 R_synthetic
+
+R_synthetic %>% 
+  matrix_to_tidydf() %>% 
+  vis_matrix(row_col = 'row', column_col = 'col',
+             value_col = 'value') + 
+  labs(y = 'Users', x = 'Movies')
 ```
 
 
@@ -237,14 +248,14 @@ for (i in 1:n_users) {
     sparse_observations <- rbind(sparse_observations, sampled_tuple)
   }
 }
-sparse_observations
+sparse_observations %>% 
+  vis_matrix(row_col = "V1", column_col = "V2",
+             value_col = "V3") +
+  labs(y = 'Users', x = 'Movies')
 ```
 
 
 ```{r}
-# To implement Gibbs
-source("code/bpmf_utils.R")
-source("code/bpmf_gibbs_sampler.R")
 # Implement Gibbs sampler
 n_replications <- 1000
 
@@ -268,23 +279,9 @@ simulation_results <- BPMF_Gibbs_Sampler(
 
 ```
 
-
-```{r}
-sparse_observations %>% 
-  as.data.frame() %>% 
-  ggplot() +
-  geom_tile(
-    mapping = aes(x = V1, y = V2, fill = V3)
-  ) + 
-  geom_text(
-    mapping = aes(x = V1, y = V2, label = round(V3,2))
-  ) + theme_minimal()
-```
-
-
 ```{r}
 index_i <- 4
-index_j <- 4
+index_j <- 3
 xs <- 500:n_replications
 sampled_rs <- xs %>% Map(function(x) {simulation_results$Rs[[x]][index_i,index_j]}, .) %>% unlist
 posterior_rs_mean <- mean(sampled_rs)
