@@ -171,3 +171,35 @@ sample_V <- function(R, mu_V, Lambda_V, U, alpha, k, n_movies) {
   }
   return(sampled_V)
 }
+
+extract_simulated_ratings <- function(simulation_results,
+                                      user_index,
+                                      movie_index) {
+  #' From the BPMF_Gibbs_Sampler(), extract simulations 
+  #' of the ratings given user and movie index
+  #' @param simulation_results: object returned from BPMF_Gibbs_Sampler()
+  #' @param user_index: integer
+  #' @param movie_index: integer
+  
+  xs <- 500:n_replications
+  sampled_rs <- xs %>% Map(function(x) {
+    simulation_results$Rs[[x]][user_index, movie_index]
+    }, .) %>% unlist
+  posterior_rs_mean <- mean(sampled_rs)
+  data.frame(
+    replication_number = xs,
+    simulated_rating = sampled_rs
+  )
+}
+
+count_user_ratings <- function(sparse_matrix, user_index) {
+  #' Given a tidy matrix with first column user_index,
+  #' second column movie_index, and last column
+  #' rating, return how many ratings user has given
+  
+  sparse_matrix %>% 
+    as.data.frame() %>% 
+    filter(.[[1]] == user_index) %>% 
+    count() %>% 
+    as.integer()
+}
