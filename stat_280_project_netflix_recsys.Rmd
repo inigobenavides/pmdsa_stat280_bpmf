@@ -205,7 +205,7 @@ c.) For each $j = 1, \cdots, M$, sample movie features in parallel $V_j^{(t+1)} 
 ```{r}
 # Generate synthetic ratings matrix
 k <- 3
-n_users <- 5
+n_users <- 4
 n_movies <- 5
 U_synthetic <- 1:n_users %>% Map(function(x) {
     sampled_covariance <- rWishart(1, k, diag(k))[,,1]
@@ -249,7 +249,7 @@ source("code/bpmf_gibbs_sampler.R")
 n_replications <- 1000
 
 # Define initial parameters
-k_estimate <- 5
+k_estimate <- 3
 alpha <- 10
 mu_0 <- rep(0, k_estimate)
 beta_0 <- 1
@@ -257,7 +257,14 @@ nu_0 <- 1
 W_0 <- diag(k_estimate)
 
 # Run
-simulation_results <- BPMF_Gibbs_Sampler(sparse_observations, k_estimate, n_replications, n_users, n_movies, mu_0, beta_0, nu_0, W_0, alpha)
+simulation_results <- BPMF_Gibbs_Sampler(
+  sparse_observations, 
+  k_estimate, 
+  n_replications, 
+  n_users, 
+  n_movies, 
+  mu_0, beta_0, nu_0, W_0, alpha
+)
 
 ```
 

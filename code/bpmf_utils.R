@@ -95,7 +95,7 @@ sample_U_i <- function(R, mu_U, Lambda_U, V, alpha, user_index, k) {
   user_observation_mask <- extract_user_observation_index(R, user_index)
   user_ratings <- extract_user_observation_ratings(R, user_index)
   num_unobserved <- nrow(V) - length(user_observation_mask)
-  V_observed <- V[user_observation_mask,]
+  V_observed <- V[user_observation_mask,,drop = FALSE]
   Lambda_i_star <- (Lambda_U + alpha * ((t(V_observed) %*% (V_observed)) + num_unobserved * diag(k)))
   
   mu_i_star <- (solve(Lambda_i_star) %*% (alpha * (t(V_observed) %*% as.matrix(user_ratings) + num_unobserved * as.matrix(rep(1, k))) + t(mu_U %*% Lambda_U)))
@@ -146,8 +146,8 @@ sample_V_i <- function(R, mu_V, Lambda_V, U, alpha, movie_index, k) {
   movie_observation_mask <- extract_movie_observation_index(R, movie_index)
   movie_ratings <- extract_movie_observation_ratings(R, movie_index)
   num_unobserved <- nrow(U) - length(movie_observation_mask)
-  U_observed <- U[movie_observation_mask, ]
-  Lambda_i_star <- (Lambda_V + alpha * ((t(U_observed) %*% (U_observed)) + num_unobserved * diag(k)))
+  U_observed <- U[movie_observation_mask, ,drop = FALSE]
+  Lambda_i_star <- (Lambda_V + alpha * ((t(U_observed) %*% U_observed) + num_unobserved * diag(k)))
   
   mu_i_star <- (solve(Lambda_i_star) %*% (alpha * (t(U_observed) %*% as.matrix(movie_ratings) + num_unobserved * as.matrix(rep(1, k))) + t(mu_V %*% Lambda_V)))
   
