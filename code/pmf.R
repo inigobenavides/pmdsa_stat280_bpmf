@@ -37,7 +37,7 @@ pmf_solver <- function(R, U, V) {
     V_init <- matrix(x[(n_users*k_estimate+1):(n_users*k_estimate + k_estimate*n_movies)], nrow=n_movies)
     
     # Compute observed square error
-    R_estimate <- (U %*% t(V)) %>% matrix_to_tidydf()
+    R_estimate <- (U_init %*% t(V_init)) %>% matrix_to_tidydf()
     R_error <- sample_entries %>%
       inner_join(R_estimate, by = c("row", "col")) %>%
       mutate(square_error=(value.x - value.y)^2)
