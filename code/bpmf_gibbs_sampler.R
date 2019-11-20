@@ -68,10 +68,10 @@ BPMF_Gibbs_Sampler <- function(R, k, n_replications, n_users, n_movies, mu_0, be
     sampled_Lambda_V <- sampled_theta_V[[2]]
     
     # Sample U
-    U_current <- sample_U(sparse_observations, sampled_mean_U, sampled_Lambda_U, V_prev, alpha, k, n_users)
+    U_current <- sample_U(R, sampled_mean_U, sampled_Lambda_U, V_prev, alpha, k, n_users)
     
     # Sample V
-    V_current <- sample_V(sparse_observations, sampled_mean_V, sampled_Lambda_V, U_current, alpha, k, n_movies)
+    V_current <- sample_V(R, sampled_mean_V, sampled_Lambda_V, U_current, alpha, k, n_movies)
     
     # Compute mean ratings
     R_current_means <- U_current %*% t(V_current)
