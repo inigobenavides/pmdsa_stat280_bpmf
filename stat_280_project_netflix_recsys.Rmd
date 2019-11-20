@@ -297,6 +297,62 @@ compute_matrix_difference(
   labs(y = 'User', x = 'Movie')
 ```
 
+```{r}
+# Visualisation for Ratings distribution
+simulations.dt %>% 
+  mutate(ratings = sapply(simulated_rating, transform_score_to_rating)) %>% 
+  group_by(
+    !!parse_expr('user_index'),
+    !!parse_expr('movie_index'),
+    !!parse_expr('ratings')
+  ) %>% 
+  summarise(count = n()) %>% 
+  group_by(
+    !!parse_expr('user_index'),
+    !!parse_expr('movie_index')
+  ) %>% 
+  mutate(percentage = count/sum(count)) %>% 
+  ungroup() %>% 
+  # Add signal if included in sparse matrix
+  full_join(
+    sparse_observations,
+    by = c('user_index' = 'row', 
+           'movie_index' = 'col')
+  ) %>% 
+  mutate(is_observed = !is.na(value)) %>% 
+  # Start Plot
+  ggplot() +
+  geom_bar(
+    mapping = aes(x = ratings, y = percentage,
+                  fill = is_observed),
+    stat = 'identity'
+  ) +
+  facet_grid(user_index ~ movie_index) +
+  theme_bw() +
+  # Add observed vline
+  geom_vline(
+    data = sparse_observations %>% 
+      rename(user_index = row) %>% 
+      rename(movie_index = col) %>% 
+      mutate(value = sapply(value, transform_score_to_rating)),
+    mapping = aes(xintercept = value),
+    color = 'blue'
+  ) + 
+  # Add mean 
+  geom_vline(
+    data = function(data) {
+      data %>% group_by(user_index,
+                        movie_index) %>% 
+        summarise(
+          mean = sum(ratings * count)/sum(count)
+        )
+    },
+    mapping = aes(xintercept = mean),
+    color = 'green'
+  )
+ 
+```
+
 
 
 
