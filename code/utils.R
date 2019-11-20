@@ -37,6 +37,7 @@ generate_synthetic_matrix <- function(n, df) {
   }, .) %>% Reduce(function(x, y){
     rbind(x, y)
   }, .)
+
 }
 
 transform_score_to_rating <- function(score) {
