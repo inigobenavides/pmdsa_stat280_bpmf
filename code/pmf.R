@@ -38,7 +38,7 @@ pmf_solver <- function(R, U, V) {
     
     # Compute observed square error
     R_estimate <- (U_init %*% t(V_init)) %>% matrix_to_tidydf()
-    R_error <- sample_entries %>%
+    R_error <- R %>%
       inner_join(R_estimate, by = c("row", "col")) %>%
       mutate(square_error=(value.x - value.y)^2)
     
