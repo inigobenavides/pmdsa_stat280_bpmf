@@ -17,6 +17,7 @@ source("code/visualisations.R")
 source("code/utils.R")
 source("code/bpmf_utils.R")
 source("code/bpmf_gibbs_sampler.R")
+source("code/pmf.R") # order of sourcing is crucial
 ```
 
 # Bayesian Probabilistic Matrix Factorization

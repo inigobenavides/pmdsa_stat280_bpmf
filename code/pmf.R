@@ -1,21 +1,21 @@
 # pmf.R
 # Functions that implement probabilistic matrix factorization
-source("code/utils.R")
-source("code/bpmf_gibbs_sampler.R")
+# source("code/utils.R")
+# source("code/bpmf_gibbs_sampler.R")
 
 # Example
-true_matrix <- matrix(c(9, 10, 11, 4, 5, 10, 1, 3, 5, 7, 5, 4), nrow=3)
-
-# Sample observations
-sample_entries <- true_matrix %>% matrix_to_tidydf %>% group_by(row) %>% sample_n(3)
-
-# Initialize U and V
-k_estimate <- 2
-n_users <- dim(true_matrix)[1]
-n_movies <- dim(true_matrix)[2]
-UV <- initialize_UV(k_estimate, n_users, n_movies)
-U_init <- UV[[1]]
-V_init <- UV[[2]]
+# true_matrix <- matrix(c(9, 10, 11, 4, 5, 10, 1, 3, 5, 7, 5, 4), nrow=3)
+# 
+# # Sample observations
+# sample_entries <- true_matrix %>% matrix_to_tidydf %>% group_by(row) %>% sample_n(3)
+# 
+# # Initialize U and V
+# k_estimate <- 2
+# n_users <- dim(true_matrix)[1]
+# n_movies <- dim(true_matrix)[2]
+# UV <- initialize_UV(k_estimate, n_users, n_movies)
+# U_init <- UV[[1]]
+# V_init <- UV[[2]]
 
 pmf_solver <- function(R, U, V) {
   # Gradient descent on error function
@@ -52,10 +52,10 @@ pmf_solver <- function(R, U, V) {
   # Reconstruct from optimized parameters
   U_estimate <- matrix(optimizer$par[1:(n_users*k_estimate)], nrow=n_users)
   V_estimate <- matrix(optimizer$par[(n_users*k_estimate+1):(n_users*k_estimate + k_estimate*n_movies)], nrow=n_movies)
-  R_estimate <- (U_estimate %*% t(V_estimate)) %>% matrix_to_tidydf()
+  R_estimate <- (U_estimate %*% t(V_estimate))
   return(R_estimate)
   
 }
 
-pmf_solver(sample_entries, U_init, V_init)
+# pmf_solver(sample_entries, U_init, V_init)
 
