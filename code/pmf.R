@@ -26,7 +26,7 @@ pmf_solver <- function(R, U, V) {
   #' @return R_estimate: Rating estimate Matrix in tidy format
 
   # Flatten U_init and V_init to UV_vec_flat
-  UV_vec_flat <- c((U_init %>% as.vector()), (V_init %>% as.vector()))
+  UV_vec_flat <- c((U %>% as.vector()), (V %>% as.vector()))
   n_users <- nrow(U)
   n_movies <- nrow(V)
   
