@@ -37,4 +37,31 @@ generate_synthetic_matrix <- function(n, df) {
   }, .) %>% Reduce(function(x, y){
     rbind(x, y)
   }, .)
+
+}
+
+transform_score_to_rating <- function(score) {
+  #' Transforms score to rating using logit and scaling
+  
+  sigmoid <- 1 /  (1 + exp(-score))
+  
+  case_when(
+    sigmoid <= 0.2 ~ 1,
+    sigmoid <= 0.4 ~ 2,
+    sigmoid <= 0.6 ~ 3,
+    sigmoid <= 0.8 ~ 4,
+    sigmoid <= 1 ~ 5
+  )
+}
+
+transform_rating_to_score <- function(rating) {
+  #' Transforms ratings to score 
+  
+  case_when(
+    rating == 1 ~ 0.2,
+    rating == 2 ~ 0.4,
+    rating == 3 ~ 0.6,
+    rating == 4 ~ 0.8,
+    rating == 5 ~ 1
+  )
 }
