@@ -29,6 +29,7 @@ pmf_solver <- function(R, U, V) {
   UV_vec_flat <- c((U %>% as.vector()), (V %>% as.vector()))
   n_users <- nrow(U)
   n_movies <- nrow(V)
+  k_estimate <- ncol(U)
   
   # Define error function
   pmf_error <- function(x) {
