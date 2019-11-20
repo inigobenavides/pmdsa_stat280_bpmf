@@ -50,8 +50,8 @@ pmf_solver <- function(R, U, V) {
   optimizer <- optim(UV_vec_flat, pmf_error)
   
   # Reconstruct from optimized parameters
-  U_estimate <- matrix(optimizer$par[1:(n_users*k_estimate)], nrow=3)
-  V_estimate <- matrix(optimizer$par[(n_users*k_estimate+1):(n_users*k_estimate + k_estimate*n_movies)], nrow=4)
+  U_estimate <- matrix(optimizer$par[1:(n_users*k_estimate)], nrow=n_users)
+  V_estimate <- matrix(optimizer$par[(n_users*k_estimate+1):(n_users*k_estimate + k_estimate*n_movies)], nrow=n_movies)
   R_estimate <- (U_estimate %*% t(V_estimate)) %>% matrix_to_tidydf()
   return(R_estimate)
   
