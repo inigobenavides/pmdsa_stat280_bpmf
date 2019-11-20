@@ -65,3 +65,42 @@ transform_rating_to_score <- function(rating) {
     rating == 5 ~ 1
   )
 }
+
+compute_matrix_difference <- function(subtrahend, minuend,
+                                      subtrahend_row_col,
+                                      subtrahend_column_col,
+                                      subtrahend_value_col,
+                                      minuend_row_col,
+                                      minuend_column_col,
+                                      minuend_value_col
+                                      ) {
+  #' Given two matrices in tidy format, compute for the 
+  #' difference among common indeces. Deletes rows
+  #' where indeces are not common to both
+  
+  subtrahend_col_names <- colnames(subtrahend)
+  minuend_col_names <- colnames(minuend)
+  
+  # Rename Row
+  colnames(subtrahend)[
+    which(subtrahend_col_names == subtrahend_row_col)
+  ] <- 'row'
+  
+  colnames(minuend)[
+    which(minuend_col_names == minuend_row_col)
+    ] <- 'row'
+  
+  # Rename Col
+  colnames(subtrahend)[
+    which(subtrahend_col_names == subtrahend_column_col)
+    ] <- 'col'
+  
+  colnames(minuend)[
+    which(minuend_col_names == minuend_column_col)
+    ] <- 'col'
+  
+  subtrahend %>% 
+    inner_join(minuend, by = c('row', 'col')) %>% 
+    mutate(difference = !!parse_expr(subtrahend_value_col) - !!parse_expr(minuend_value_col)) %>% 
+    select(row, col, difference)
+}
