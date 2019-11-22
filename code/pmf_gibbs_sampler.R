@@ -1,5 +1,5 @@
-# Bayesian Probabilistic Matrix Factorization
-source("code/bpmf_utils.R")
+# Probabilistic Matrix Factorization
+source("code/pmf_utils.R")
 
 
 initialize_UV <- function(k_estimate, n_users, n_movies) {
@@ -22,18 +22,16 @@ initialize_UV <- function(k_estimate, n_users, n_movies) {
 }
 
 
-BPMF_Gibbs_Sampler <- function(R, k, n_replications, n_users, n_movies, mu_0, beta_0, nu_0, W_0, alpha) {
-  # Implements Bayesian Probabilistic Matrix Factorization via Gibbs Sampling
+PMF_Gibbs_Sampler <- function(R, k, n_replications, n_users, n_movies, sigma_U, sigma_V, sigma) {
+  # Implements Probabilistic Matrix Factorization via Gibbs Sampling
   #' @param R: Matrix of [user_index, movie_index, rating]
   #' @param k: estimated number of latent dimensions for U and V
   #' @param n_replications: number of replications to run for Gibbs Sampler
   #' @param n_users: number of users in data set
   #' @param n_movies: number of movies in data set
-  #' @param mu_0: hyperparameter Matrix[k x 1]
-  #' @param beta_0: hyperparameter Scalar
-  #' @param nu_0: hyperparameter Scalar
-  #' @param W_0: hyperparameter Matrix[k x k]
-  #' @param alpha: hyperparameter Scalar
+  #' @param sigma_U: prior precision on latent user vectors
+  #' @param sigma_V: prior precision on latent movie vectors
+  #' @param sigma: precision for ratings
   #' @return results[List[Rs, Us, Vs, mu_Us, mu_Vs, Lambda_Us, Lambda_Vs]]
   
   # Initialize U and V
@@ -42,10 +40,6 @@ BPMF_Gibbs_Sampler <- function(R, k, n_replications, n_users, n_movies, mu_0, be
   V_current <- UV_init[[2]]
   
   # Initialize collections
-  mu_Us <- list()
-  mu_Vs <- list()
-  Lambda_Us <- list()
-  Lambda_Vs <- list()
   Rs <- list()
   Us <- list()
   Vs <- list()
@@ -57,21 +51,11 @@ BPMF_Gibbs_Sampler <- function(R, k, n_replications, n_users, n_movies, mu_0, be
     U_prev <- U_current
     V_prev <- V_current
     
-    # Sample theta U
-    sampled_theta_U <- sample_theta_U(U_prev, mu_0, beta_0, nu_0, W_0, n_users)
-    sampled_mean_U <- sampled_theta_U[[1]]
-    sampled_Lambda_U <- sampled_theta_U[[2]]
-    
-    # Sample theta V
-    sampled_theta_V <- sample_theta_V(V_prev, mu_0, beta_0, nu_0, W_0, n_movies)
-    sampled_mean_V <- sampled_theta_V[[1]]
-    sampled_Lambda_V <- sampled_theta_V[[2]]
-    
     # Sample U
-    U_current <- sample_U(R, sampled_mean_U, sampled_Lambda_U, V_prev, alpha, k, n_users)
+    U_current <- sample_U_pmf(R, V_prev, sigma_U, sigma, n_users)
     
     # Sample V
-    V_current <- sample_V(R, sampled_mean_V, sampled_Lambda_V, U_current, alpha, k, n_movies)
+    V_current <- sample_V_pmf(R, U_current, sigma_V, sigma, n_movies)
     
     # Compute mean ratings
     R_current_means <- U_current %*% t(V_current)
@@ -83,11 +67,6 @@ BPMF_Gibbs_Sampler <- function(R, k, n_replications, n_users, n_movies, mu_0, be
                            dim=dim(R_current_means))
     
     # Collect replication samples
-    mu_Us[[i]] <- sampled_mean_U
-    mu_Vs[[i]] <- sampled_mean_V
-    Lambda_Us[[i]] <- sampled_Lambda_U
-    Lambda_Vs[[i]] <- sampled_Lambda_V
-    
     Us[[i]] <- U_current
     Vs[[i]] <- V_current
     Rs[[i]] <- R_current
@@ -97,12 +76,19 @@ BPMF_Gibbs_Sampler <- function(R, k, n_replications, n_users, n_movies, mu_0, be
   results$Rs <- Rs
   results$Us <- Us
   results$Vs <- Vs
-  results$mu_Us <- mu_Us
-  results$mu_Vs <- mu_Vs
-  results$Lambda_Us <- Lambda_Us
-  results$Lambda_Vs <- Lambda_Vs
   
   return(results)
   
 }
+
+# pmf_simulation <- PMF_Gibbs_Sampler(
+#   R = sparse_observations,
+#   k = k,
+#   n_replications = 1000,
+#   n_users = n_users,
+#   n_movies = n_movies,
+#   sigma_U = 10,
+#   sigma_V = 10,
+#   sigma = 10
+# )
 

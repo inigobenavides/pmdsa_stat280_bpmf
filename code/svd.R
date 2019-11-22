@@ -1,23 +1,7 @@
-# pmf.R
-# Functions that implement probabilistic matrix factorization
-# source("code/utils.R")
-# source("code/bpmf_gibbs_sampler.R")
+# svd.R
+# Functions that implements SVD
 
-# Example
-# true_matrix <- matrix(c(9, 10, 11, 4, 5, 10, 1, 3, 5, 7, 5, 4), nrow=3)
-# 
-# # Sample observations
-# sample_entries <- true_matrix %>% matrix_to_tidydf %>% group_by(row) %>% sample_n(3)
-# 
-# # Initialize U and V
-# k_estimate <- 2
-# n_users <- dim(true_matrix)[1]
-# n_movies <- dim(true_matrix)[2]
-# UV <- initialize_UV(k_estimate, n_users, n_movies)
-# U_init <- UV[[1]]
-# V_init <- UV[[2]]
-
-pmf_solver <- function(R, U, V) {
+svd_solver <- function(R, U, V) {
   # Gradient descent on error function
   # with respect to U and V
   #' @param R: Rating matrix in tidy format
@@ -32,7 +16,7 @@ pmf_solver <- function(R, U, V) {
   k_estimate <- ncol(U)
   
   # Define error function
-  pmf_error <- function(x) {
+  svd_error <- function(x) {
     # Reconstruct U_init and V_init from UV_vec_flat
     U_init <- matrix(x[1:(n_users*k_estimate)], nrow=n_users)
     V_init <- matrix(x[(n_users*k_estimate+1):(n_users*k_estimate + k_estimate*n_movies)], nrow=n_movies)
@@ -48,7 +32,7 @@ pmf_solver <- function(R, U, V) {
   }
   
   # Optimize error function parameters
-  optimizer <- optim(UV_vec_flat, pmf_error)
+  optimizer <- optim(UV_vec_flat, svd_error)
   
   # Reconstruct from optimized parameters
   U_estimate <- matrix(optimizer$par[1:(n_users*k_estimate)], nrow=n_users)
@@ -58,5 +42,4 @@ pmf_solver <- function(R, U, V) {
   
 }
 
-# pmf_solver(sample_entries, U_init, V_init)
 
