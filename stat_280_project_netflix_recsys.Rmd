@@ -60,6 +60,12 @@ ratings %>% summarise(nrows=n(),
                       max_rating=max(rating))
 ```
 
+```{r}
+# Sample ratings
+sampled_ratings <- sample_ratings(ratings, 100, 100)
+sampled_ratings %>% summarise(n_users=n_distinct(userId),
+                              n_movies=n_distinct(movieId))
+```
 
 
 ```{r}
@@ -79,15 +85,6 @@ ratings %>%
   head(100) %>% 
   left_join(movies, by=c("movieId")) %>% 
   select(title, mean_rating, count)
-```
-
-
-```{r}
-ratings %>%
-  group_by(movieId) %>%
-  summarise(mean_rating=mean(rating), count=n()) %>% 
-  sample_n(2000) %>% 
-  ggplot(aes(x=log10(count), y=mean_rating)) + geom_point() + geom_smooth() + theme_minimal()
 ```
 
 ## Model
