@@ -3,6 +3,46 @@
 
 library(purrr)
 
+sample_ratings <- function(R, approx_n_users, n_movies) {
+  # Stratify samples a ratings matrix in tidy format
+  # first by rating distribution per user
+  # then by rating distribution per movie
+  #' @param R: Ratings matrix in tidy format 
+  #' @param approx_n_users: number of users to sample per decile
+  #' @param n_movies: number of movies to sample per decile
+  #' @return R_subset: Subset ratings matrix with n distinct users <= approx_n_users and n_distinct movies 
+  
+  users_to_sample_per_decile <- floor(approx_n_users / 10)
+  movies_to_sample_per_decile <- floor(n_movies / 10)
+  
+  # Stratify sample ratings by count distribution per user
+  sampled_users <- R %>%
+    group_by(userId) %>%
+    summarise(n=n()) %>%
+    mutate(decile_user=ntile(n, 10)) %>% 
+    group_by(decile_user) %>% 
+    sample_n(users_to_sample_per_decile)
+  
+  ratings_user_subset <- R %>%
+    inner_join(sampled_users, by="userId") %>%
+    select(userId, movieId, rating, timestamp, decile_user)
+  
+  # Stratify sample ratings by count distribution per movie
+  sampled_movies <- ratings_user_subset %>%
+    group_by(movieId) %>%
+    summarise(n=n()) %>%
+    mutate(decile_movie=ntile(n, 10)) %>% 
+    group_by(decile_movie) %>% 
+    sample_n(movies_to_sample_per_decile)
+  
+  ratings_user_movie_subset <- ratings_user_subset %>%
+    inner_join(sampled_movies, by="movieId") %>%
+    select(userId, movieId, rating, timestamp)
+  
+  return(ratings_user_movie_subset)
+  
+}
+
 matrix_to_tidydf <- function(matrix) {
   #' Converts a matrix datatype into a tidyformat dataframe
   #' with first column
