@@ -209,7 +209,9 @@ n_movies <- 10
 U_synthetic <- generate_synthetic_matrix(n_users, k)
 V_synthetic <- generate_synthetic_matrix(n_movies, k)
 R_synthetic <- U_synthetic %*% t(V_synthetic)
-R_synthetic_tidy <- R_synthetic %>% matrix_to_tidydf()
+R_synthetic_tidy <- R_synthetic %>% 
+  matrix_to_tidydf() %T>%
+  saveRDS("bpmf_shiny/dummy_data/synthetic_simulations.rds")
 
 R_synthetic_tidy %>% 
   mutate(value = sapply(value, transform_score_to_rating)) %>% 
@@ -223,7 +225,8 @@ R_synthetic_tidy %>%
 # Randomly nk sample entries from synthetic ratings matrix
 # For every row, sample at least 3 ratings
 sparse_observations <- R_synthetic_tidy %>% 
-  sample_n(nrow(R_synthetic_tidy)/2)
+  sample_n(nrow(R_synthetic_tidy)/2) %T>%
+  saveRDS("bpmf_shiny/dummy_data/synthetic_simulations_sparse.rds")
 sparse_observations %>% 
   mutate(value = sapply(value, transform_score_to_rating)) %>%
   vis_matrix(row_col = "row", column_col = "col",
@@ -231,6 +234,8 @@ sparse_observations %>%
   labs(y = 'Users', x = 'Movies')
 ```
 
+
+### BPMF
 
 ```{r}
 # Implement Gibbs sampler
@@ -254,9 +259,6 @@ simulation_results <- BPMF_Gibbs_Sampler(
   mu_0, beta_0, nu_0, W_0, alpha
 )
 
-```
-
-```{r}
 # Take simulated ratings for each user 
 simulations.dt <- map2_df(
   .x = expand.grid(1:n_users, 1:n_movies)$Var1,
@@ -268,6 +270,18 @@ simulations.dt <- map2_df(
   }
 )
 
+# Visualize the mean
+simulations.dt %>% group_by(user_index, movie_index) %>% 
+  summarise(mean_rating = mean(simulated_rating)) %>% 
+  ungroup() %>% 
+  mutate(mean_rating = sapply(mean_rating, transform_score_to_rating)) %>% 
+  vis_matrix(row_col = "user_index",
+             column_col = "movie_index",
+             value_col = "mean_rating")
+
+```
+
+```{r}
 compute_matrix_difference(
   subtrahend = simulations.dt %>% 
     group_by(movie_index, user_index) %>% 
@@ -288,62 +302,6 @@ compute_matrix_difference(
              column_col = 'col',
              value_col = 'difference') +
   labs(y = 'User', x = 'Movie')
-```
-
-```{r}
-# Visualisation for Ratings distribution
-simulations.dt %>% 
-  mutate(ratings = sapply(simulated_rating, transform_score_to_rating)) %>% 
-  group_by(
-    !!parse_expr('user_index'),
-    !!parse_expr('movie_index'),
-    !!parse_expr('ratings')
-  ) %>% 
-  summarise(count = n()) %>% 
-  group_by(
-    !!parse_expr('user_index'),
-    !!parse_expr('movie_index')
-  ) %>% 
-  mutate(percentage = count/sum(count)) %>% 
-  ungroup() %>% 
-  # Add signal if included in sparse matrix
-  full_join(
-    sparse_observations,
-    by = c('user_index' = 'row', 
-           'movie_index' = 'col')
-  ) %>% 
-  mutate(is_observed = !is.na(value)) %>% 
-  # Start Plot
-  ggplot() +
-  geom_bar(
-    mapping = aes(x = ratings, y = percentage,
-                  fill = is_observed),
-    stat = 'identity'
-  ) +
-  facet_grid(user_index ~ movie_index) +
-  theme_bw() +
-  # Add observed vline
-  geom_vline(
-    data = sparse_observations %>% 
-      rename(user_index = row) %>% 
-      rename(movie_index = col) %>% 
-      mutate(value = sapply(value, transform_score_to_rating)),
-    mapping = aes(xintercept = value),
-    color = 'blue'
-  ) + 
-  # Add mean 
-  geom_vline(
-    data = function(data) {
-      data %>% group_by(user_index,
-                        movie_index) %>% 
-        summarise(
-          mean = sum(ratings * count)/sum(count)
-        )
-    },
-    mapping = aes(xintercept = mean),
-    color = 'green'
-  )
- 
 ```
 
 

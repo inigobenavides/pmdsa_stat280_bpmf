@@ -184,7 +184,7 @@ extract_simulated_ratings <- function(simulation_results,
   #' @param user_index: integer
   #' @param movie_index: integer
   
-  xs <- 500:n_replications
+  xs <- 500:length(simulation_results)
   sampled_rs <- xs %>% Map(function(x) {
     simulation_results$Rs[[x]][user_index, movie_index]
     }, .) %>% unlist

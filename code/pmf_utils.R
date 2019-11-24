@@ -1,6 +1,5 @@
 # pmf_utils.R
 # Defines helper functions to implement in PMF Gibbs Sampler
-source("code/bpmf_utils.R")
 
 sample_U_i_pmf <- function(R, V, sigma_U, sigma, user_index) {
   # Samples U_i for PMF Gibbs sampler
