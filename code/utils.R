@@ -80,42 +80,36 @@ generate_synthetic_matrix <- function(n, df) {
 
 }
 
-transform_score_to_rating <- function(score) {
-  #' Transforms score to rating using logit and scaling
-  
-  sigmoid <- 1 /  (1 + exp(-score))
-  
-  case_when(
-    sigmoid <= 0.1 ~ 0,
-    sigmoid <= 0.2 ~ 0.5,
-    sigmoid <= 0.3 ~ 1,
-    sigmoid <= 0.4 ~ 1.5,
-    sigmoid <= 0.5 ~ 2,
-    sigmoid <= 0.6 ~ 2.5,
-    sigmoid <= 0.7 ~ 3,
-    sigmoid <= 0.8 ~ 3.5,
-    sigmoid <= 0.9 ~ 4,
-    sigmoid <= 1 ~ 4.5
-  )
-}
-
-transform_rating_to_score <- function(rating) {
+transform_rating_to_score <- function(rating, 
+                                      min = 0.5,
+                                      max = 5,
+                                      by = 0.5) {
   #' Transforms ratings to score 
   
   rescaling <- case_when(
-    rating == 0.5 ~ 0.000001 # 0 returns NA,
-    rating == 1 ~ 0.1,
-    rating == 1.5 ~ 0.2,
-    rating == 2 ~ 0.3,
-    rating == 2.5 ~ 0.4,
-    rating == 3 ~ 0.5,
-    rating == 3.5 ~ 0.6,
-    rating == 4 ~ 0.7,
-    rating == 4.5 ~ 0.8,
-    rating == 5 ~ 0.9 # 1 returns Inf
+    rating == min ~ 0.000000000001,
+    rating == max ~ 0.999999999999,
+    TRUE ~ (rating - by)/(max - by)
   )
   
   log(rescaling / (1 - rescaling))
+}
+
+transform_score_to_rating <- function(score, 
+                                      min = 0.5,
+                                      max = 5,
+                                      by = 0.5) {
+  #' Transforms score to rating using logit and scaling
+  
+  sigmoid <- 1 / (1 + exp(-score))
+  
+  case_when(
+    sigmoid <= transform_rating_to_score(min, min = min, max = max,
+                              by = by) ~ min,
+    sigmoid >= transform_rating_to_score(max, min = min, max = max,
+                                       by = by) ~ max,
+    TRUE ~ sigmoid * (max - by) + by
+  )
 }
 
 compute_matrix_difference <- function(subtrahend, minuend,
