@@ -396,8 +396,8 @@ sampled_ratings_mapped %>%
 n_replications <- 1000
 
 # Define initial parameters
-k_estimate <- 15
-alpha <- 1
+k_estimate <- 5
+alpha <- 2
 mu_0 <- rep(0, k_estimate)
 beta_0 <- 1
 nu_0 <- 1
