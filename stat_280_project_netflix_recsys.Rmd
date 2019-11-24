@@ -396,7 +396,7 @@ sampled_ratings_mapped %>%
 n_replications <- 1000
 
 # Define initial parameters
-k_estimate <- 5
+k_estimate <- 10
 alpha <- 2
 mu_0 <- rep(0, k_estimate)
 beta_0 <- 1
@@ -432,13 +432,18 @@ netflix_bpmf_gibbs_results <- BPMF_Gibbs_Sampler(
 
 ```{r}
 # Visualize posterior untransformed
-viz_posterior_rating(21, 30, sampled_ratings_mapped, netflix_bpmf_gibbs_results, transformed = FALSE)
+viz_posterior_rating(16, 8, sampled_ratings_mapped, netflix_bpmf_gibbs_results, transformed = FALSE)
 ```
 
 ```{r}
 # Visualize posterior transformed
-viz_posterior_rating(21, 30, sampled_ratings_mapped, netflix_bpmf_gibbs_results, transformed = TRUE)
+viz_posterior_rating(16, 8, sampled_ratings_mapped, netflix_bpmf_gibbs_results, transformed = TRUE)
 ```
 
+```{r}
+sampled_ratings_mapped %>% 
+  filter(user_key == 16) %>% 
+  filter(movie_key == 8)
+```
 
 

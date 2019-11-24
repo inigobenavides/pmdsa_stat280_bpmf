@@ -65,8 +65,8 @@ viz_posterior_rating <- function(user_index,
     select(rating) %>% 
     as.numeric()
   
-  if (transformed) {
-    true_rating <- true_rating %>% transform_score_to_rating
+  if (!transformed) {
+    true_rating <- true_rating %>% transform_rating_to_score()
   }
   
   x <- xs %>%
