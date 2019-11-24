@@ -40,3 +40,46 @@ vis_matrix <- function(data, row_col, column_col,
   
   return(plot)
 }
+
+viz_posterior_rating <- function(user_index,
+                                 movie_index,
+                                 sampled_ratings_mapped,
+                                 gibbs_results,
+                                 burn_in = 500,
+                                 transformed = TRUE) {
+  # Visualizes the posterior rating distribution
+  # for a given user and movie
+  #' @param user_index: index of user to visualize
+  #' @param movie_index: index of movie to visualize
+  #' @param sampled_ratings_mapped: matrix of mapped ratings in tidy format
+  #' @param gibbs_results: result object from BPMF_Gibbs_Sampler()
+  #' @param burn_in: (optional) number of replications to burn in, default 500
+  #' @param transformed: (optional) boolean of whether to plot transformed posterior, default TRUE
+  #' @return viz: ggplot visualization of posterior density
+
+  n_replications <- netflix_bpmf_gibbs_results$Rs %>% length
+  xs <- burn_in:n_replications
+  true_rating <- sampled_ratings_mapped %>%
+    filter(user_key == user_index) %>% 
+    filter(movie_key == movie_index) %>% 
+    select(rating) %>% 
+    as.numeric()
+  
+  x <- xs %>%
+    Map(function(y) {
+      if (transformed) {
+        gibbs_results$Rs[[y]][user_index, movie_index] %>% 
+          transform_score_to_rating
+      } else {
+        gibbs_results$Rs[[y]][user_index, movie_index]
+      }
+    }, .) %>% unlist
+  
+  data.frame(x=x) %>%
+    ggplot(aes(x=x)) +
+    geom_density() +
+    theme_minimal() +
+    geom_vline(xintercept=true_rating, color='red') -> plot
+  
+  return(plot)
+}

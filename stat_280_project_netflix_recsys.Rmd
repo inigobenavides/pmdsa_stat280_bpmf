@@ -60,12 +60,7 @@ ratings %>% summarise(nrows=n(),
                       max_rating=max(rating))
 ```
 
-```{r}
-# Sample ratings
-sampled_ratings <- sample_ratings(ratings, 100, 100)
-sampled_ratings %>% summarise(n_users=n_distinct(userId),
-                              n_movies=n_distinct(movieId))
-```
+
 
 
 ```{r}
@@ -79,8 +74,8 @@ movies %>% head
 # Top 100 Movies by mean ratings with at least 1000 
 ratings %>%
   group_by(movieId) %>%
-  summarise(mean_rating=mean(rating), count=n()) %>% 
-  filter(count > 1000) %>% 
+  summarise(mean_rating=mean(rating), count=n()) %>%
+  filter(count >= 1000) %>% 
   arrange(desc(mean_rating)) %>% 
   head(100) %>% 
   left_join(movies, by=c("movieId")) %>% 
@@ -351,6 +346,99 @@ simulations.dt %>%
  
 ```
 
+
+## Netflix Data
+
+In this section, we apply the BPMF Gibbs Sampler to our sampled ratings data set on 15 users and 25 movies.
+
+```{r}
+set.seed(1)
+# Sample ratings
+sampled_ratings <- sample_ratings(ratings, 30, 30)
+sampled_ratings %>% summarise(n_users=n_distinct(userId),
+                              n_movies=n_distinct(movieId),
+                              n_ratings=n())
+```
+
+
+```{r}
+# Apply mapping from userId -> userKey and movieId -> movieKey
+# This allows it to work with the Gibbs Sampler which assumes 1:n_users as
+# indices for users and 1:n_movies as indices for movies
+sampled_ratings_user_key <- sampled_ratings %>%
+  select(userId) %>%
+  distinct %>%
+  mutate(user_key=row_number())
+
+sampled_ratings_movie_key <- sampled_ratings %>%
+  select(movieId) %>%
+  distinct %>%
+  mutate(movie_key=row_number())
+
+sampled_ratings_mapped <- sampled_ratings %>%
+  left_join(sampled_ratings_user_key, by="userId") %>% 
+  left_join(sampled_ratings_movie_key, by="movieId") %>% 
+  select(user_key, movie_key, rating)
+
+sampled_ratings_mapped %>% head
+```
+
+```{r}
+sampled_ratings_mapped %>%
+  vis_matrix(data = .,
+             row_col = "user_key",
+             column_col = "movie_key",
+             value_col = "rating")
+```
+
+```{r}
+# Implement Gibbs sampler
+n_replications <- 1000
+
+# Define initial parameters
+k_estimate <- 15
+alpha <- 1
+mu_0 <- rep(0, k_estimate)
+beta_0 <- 1
+nu_0 <- 1
+W_0 <- diag(k_estimate)
+
+sampled_ratings_matrix <- sampled_ratings_mapped %>%
+  mutate(rating=sapply(rating, transform_rating_to_score)) %>% 
+  select(user_key, movie_key, rating) %>%
+  as.matrix
+
+n_users <- sampled_ratings_mapped %>%
+  summarise(n_users=n_distinct(user_key)) %>%
+  as.numeric()
+
+n_movies <- sampled_ratings_mapped %>%
+  summarise(n_movies=n_distinct(movie_key)) %>%
+  as.numeric()
+```
+
+```{r}
+# Run
+netflix_bpmf_gibbs_results <- BPMF_Gibbs_Sampler(
+  sampled_ratings_matrix, 
+  k_estimate, 
+  n_replications, 
+  n_users, 
+  n_movies, 
+  mu_0, beta_0, nu_0, W_0, alpha
+)
+```
+
+
+```{r}
+# Visualize posterior untransformed
+viz_posterior_rating(21, 30, sampled_ratings_mapped, netflix_bpmf_gibbs_results, transformed = FALSE)
+```
+
+```{r}
+# Visualize posterior transformed
+viz_posterior_rating(21, 30, sampled_ratings_mapped, netflix_bpmf_gibbs_results, transformed = TRUE)
+```
 
 
 

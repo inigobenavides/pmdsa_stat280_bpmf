@@ -4,6 +4,10 @@ source("code/bpmf_utils.R")
 
 initialize_UV <- function(k_estimate, n_users, n_movies) {
   # Initializes U and V latent feature matrices
+  #' @param k_estimate: number of latent features
+  #' @param n_users: number of users
+  #' @param n_movies: number of movies
+  #' @return List[U_init, V_init]
   U_init <- 1:n_users %>% Map(function(x) {
     sampled_covariance <- rWishart(1, k_estimate, diag(k_estimate))[,,1]
     rmvnorm(1, mean=rep(0, k_estimate), sigma=sampled_covariance)
