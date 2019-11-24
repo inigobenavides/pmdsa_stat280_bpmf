@@ -90,8 +90,8 @@ server <- function(input, output, session) {
           value_col = "mean_rating"
         ) + labs(x = "Movie", y = "User") +
         theme(legend.position = "none")
-    })
-  }, source = "full_matrix")
+    }, source = "full_matrix")
+  })
   
   # Detect clicks
   selected_datapoint <- reactive({
