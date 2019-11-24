@@ -13,6 +13,7 @@ library("feather")
 library("mvtnorm")
 library("glue")
 library("rlang")
+library("magrittr")
 source("code/visualisations.R")
 source("code/utils.R")
 source("code/bpmf_utils.R")
@@ -210,8 +211,7 @@ U_synthetic <- generate_synthetic_matrix(n_users, k)
 V_synthetic <- generate_synthetic_matrix(n_movies, k)
 R_synthetic <- U_synthetic %*% t(V_synthetic)
 R_synthetic_tidy <- R_synthetic %>% 
-  matrix_to_tidydf() %T>%
-  saveRDS("bpmf_shiny/dummy_data/synthetic_simulations.rds")
+  matrix_to_tidydf()
 
 R_synthetic_tidy %>% 
   mutate(value = sapply(value, transform_score_to_rating)) %>% 
