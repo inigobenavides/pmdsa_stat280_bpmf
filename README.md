@@ -1,13 +1,15 @@
-# pmdsa_stat280_bpmf
+# Bayesian Probabilistic Matrix Factorization via Gibbs Sampling
 
-# Data Setup
+This project implements Salakhutdinov and Mnih's [*Bayesian Probabilistic Matrix Factorization using Markov Chain Monte Carlo*](https://www.cs.toronto.edu/~amnih/papers/bpmf.pdf) (2008) model in R. We use the [MovieLens (20M)](https://www.kaggle.com/grouplens/movielens-20m-dataset/data#), which contains 20,000,263 ratings across 27,278 movies from 138,493 users.
 
-1) Add ratings.feather into base folder.
+## Data Setup
 
-# How to run bpmf_shiny
+1) Add `ratings.feather` into base folder.
 
-1) create dummy_data folder in bpmf_shiny folder
-2) open project of rmd, run that chunk
-2.5) open bpmf_shiny/shiny_sandbox.R to generate data for netflix sample
-3) open project of shiny
-4) run shiny app
+## How to run bpmf_shiny
+
+1) Create `dummy_data` folder in `bpmf_shiny` folder
+2) Open project of rmd, run that chunk
+3) Open `bpmf_shiny/shiny_sandbox.R` to generate data for netflix sample
+4) Open project of Shiny
+5) Run Shiny app
