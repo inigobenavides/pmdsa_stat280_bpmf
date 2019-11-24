@@ -7,7 +7,8 @@ server <- function(input, output, session) {
   
   # Read Files 
   observed.dt <- reactive({
-    readRDS("dummy_data/synthetic_simulations_sparse.rds")
+    # readRDS("dummy_data/synthetic_simulations_sparse.rds")
+    readRDS("dummy_data/netflix_sample.rds")
   })
   
   # Visualising the observed matrix
@@ -33,7 +34,7 @@ server <- function(input, output, session) {
       n_replications <- 1000
       
       # Define initial parameters
-      k_estimate <- 3
+      k_estimate <- 5
       alpha <- 10
       mu_0 <- rep(0, k_estimate)
       beta_0 <- 1
