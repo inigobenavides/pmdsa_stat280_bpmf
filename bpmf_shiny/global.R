@@ -1,4 +1,9 @@
 # Load Libraries
+library("shiny")
+library("shinydashboard")
+library("ggplot2")
+library("magrittr")
+library("plotly")
 library("tidyverse")
 library("DBI")
 library("RSQLite")
