@@ -12,6 +12,7 @@ library("mvtnorm")
 library("glue")
 library("rlang")
 library("DT")
+library("purrr")
 
 # Source Relevant Code
 walk(list.files("../code", full.names = TRUE), .f = function(x) {source(x)})
