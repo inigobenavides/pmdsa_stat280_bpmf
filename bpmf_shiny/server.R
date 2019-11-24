@@ -90,8 +90,8 @@ server <- function(input, output, session) {
           value_col = "mean_rating"
         ) + labs(x = "Movie", y = "User") +
         theme(legend.position = "none")
-    })
-  }, source = "full_matrix")
+    }, source = "full_matrix")
+  })
   
   # Detect clicks
   selected_datapoint <- reactive({
@@ -158,6 +158,14 @@ server <- function(input, output, session) {
           x = ifelse(density_type == "Score", "Score", "Rating"),
           title = glue("User: {selected_datapoint()$user}; Movie: {selected_datapoint()$movie}")
         )
+      
+      if(density_type == "Score") {
+        plot <- plot + 
+          scale_x_continuous(limits = c(-15, 15))
+      } else {
+        plot <- plot +
+          scale_x_continuous(limits = c(0.5, 5))
+      }
       
       incProgress(amount = 0.6, message = "Finished!")
     })
