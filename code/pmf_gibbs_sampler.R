@@ -1,5 +1,4 @@
 # Probabilistic Matrix Factorization
-source("code/pmf_utils.R")
 
 
 initialize_UV <- function(k_estimate, n_users, n_movies) {

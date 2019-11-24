@@ -1,5 +1,4 @@
 # Bayesian Probabilistic Matrix Factorization
-source("code/bpmf_utils.R")
 
 
 initialize_UV <- function(k_estimate, n_users, n_movies) {
