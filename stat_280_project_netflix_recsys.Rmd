@@ -352,8 +352,9 @@ simulations.dt %>%
 In this section, we apply the BPMF Gibbs Sampler to our sampled ratings data set on 15 users and 25 movies.
 
 ```{r}
+set.seed(1)
 # Sample ratings
-sampled_ratings <- sample_ratings(ratings, 25, 25)
+sampled_ratings <- sample_ratings(ratings, 30, 30)
 sampled_ratings %>% summarise(n_users=n_distinct(userId),
                               n_movies=n_distinct(movieId),
                               n_ratings=n())
@@ -392,10 +393,10 @@ sampled_ratings_mapped %>%
 
 ```{r}
 # Implement Gibbs sampler
-n_replications <- 800
+n_replications <- 1000
 
 # Define initial parameters
-k_estimate <- 10
+k_estimate <- 15
 alpha <- 1
 mu_0 <- rep(0, k_estimate)
 beta_0 <- 1
@@ -403,7 +404,7 @@ nu_0 <- 1
 W_0 <- diag(k_estimate)
 
 sampled_ratings_matrix <- sampled_ratings_mapped %>%
-  mutate(rating=(rating - 1)/5) %>% 
+  mutate(rating=sapply(rating, transform_rating_to_score)) %>% 
   select(user_key, movie_key, rating) %>%
   as.matrix
 
@@ -414,7 +415,9 @@ n_users <- sampled_ratings_mapped %>%
 n_movies <- sampled_ratings_mapped %>%
   summarise(n_movies=n_distinct(movie_key)) %>%
   as.numeric()
+```
 
+```{r}
 # Run
 netflix_bpmf_gibbs_results <- BPMF_Gibbs_Sampler(
   sampled_ratings_matrix, 
@@ -426,12 +429,16 @@ netflix_bpmf_gibbs_results <- BPMF_Gibbs_Sampler(
 )
 ```
 
+
 ```{r}
-sampled_ratings_matrix
+# Visualize posterior untransformed
+viz_posterior_rating(21, 30, sampled_ratings_mapped, netflix_bpmf_gibbs_results, transformed = FALSE)
+```
+
+```{r}
+# Visualize posterior transformed
+viz_posterior_rating(21, 30, sampled_ratings_mapped, netflix_bpmf_gibbs_results, transformed = TRUE)
 ```
 
 
-```{r}
-netflix_bpmf_gibbs_results$Rs[[800]]
-```
 
