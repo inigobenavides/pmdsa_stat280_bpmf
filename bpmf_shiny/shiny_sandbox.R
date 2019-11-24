@@ -1,42 +1,9 @@
 ratings <- read_feather("../rating.feather")
 
-# Top Users
-top_users <- ratings %>%
-  group_by(userId) %>% 
-  summarise(
-    num_movies = n()
-  ) %>% 
-  ungroup() %>% 
-  arrange(desc(num_movies)) %$%
-  userId %>% 
-  {.[1:10]}
+source('global.R')
 
-
-# Top movies 
-
-# Sample movies with more than 4 user ratings
-sample_movies <- ratings %>% 
-  filter(userId %in% top_users) %>% 
-  group_by(movieId) %>% 
-  summarise(
-    num_users = n()
-  ) %>% ungroup() %>% 
-  arrange(desc(num_users)) %>% 
-  filter(num_users >= 5) %>% 
-  sample_n(10) %$% 
-  movieId %>% 
-  {.[1:10]}
-
-ratings %>% 
-  filter(userId %in% top_users) %>% 
-  filter(movieId %in% sample_movies) %>% 
-  mutate(userId = as.numeric(factor(userId, labels = seq(1:10)))) %>% 
-  mutate(movieId = as.numeric(factor(movieId, labels = seq(1:10)))) %>% 
-  rename(
-    row = userId,
-    col = movieId,
-    value = rating
-  ) %>% 
-  mutate(value = sapply(value, transform_rating_to_score)) %>% 
-  as.data.frame() %>% 
+sample_ratings_top_users(ratings, n_users = 10,
+                         n_movies = 10, 
+                         max_num_users_per_movie = 8,
+                         min_num_users_per_movie = 4) %>% 
   saveRDS("dummy_data/netflix_sample.rds")

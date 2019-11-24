@@ -12,13 +12,10 @@ library("RSQLite")
 library("feather")
 library("mvtnorm")
 library("glue")
+library("purrr")
 library("rlang")
 library("magrittr")
-source("code/visualisations.R")
-source("code/utils.R")
-source("code/bpmf_utils.R")
-source("code/bpmf_gibbs_sampler.R")
-source("code/svd.R") # order of sourcing is crucial
+walk(list.files("code", full.names = TRUE), .f = function(x) {source(x)})
 ```
 
 # Bayesian Probabilistic Matrix Factorization

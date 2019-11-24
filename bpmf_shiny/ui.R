@@ -21,12 +21,16 @@ ui <-
             width = 3,
             box(
               width = 12,
-              column(
-                width = 4,
-                actionButton(
-                  inputId = "generate_simulations",
-                  label = "Generate Simulations"
-                )
+              actionButton(
+                inputId = "generate_simulations",
+                label = "Generate Simulations"
+              ),
+              radioButtons(
+                inputId = "remove_text",
+                label = "Remove Text",
+                choices = c("Yes", "No"),
+                inline = TRUE,
+                selected = "No"
               )
             )
           ),

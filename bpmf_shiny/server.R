@@ -1,5 +1,18 @@
-
-
+# Remove Geom Function
+remove_geom <- function(ggplot2_object, geom_type) {
+  # Delete layers that match the requested type.
+  layers <- lapply(ggplot2_object$layers, function(x) {
+    if (class(x$geom)[1] == geom_type) {
+      NULL
+    } else {
+      x
+    }
+  })
+  # Delete the unwanted layers.
+  layers <- layers[!sapply(layers, is.null)]
+  ggplot2_object$layers <- layers
+  ggplot2_object
+}
 
 # Server 
 
@@ -13,16 +26,21 @@ server <- function(input, output, session) {
   
   # Visualising the observed matrix
   output$observed_ratings <- renderPlotly({
-    ggplotly({
-      observed.dt() %>% 
-        mutate(rating = sapply(value, transform_score_to_rating)) %>% 
-        vis_matrix(
-          row_col = "row", 
-          column_col = "col",
-          value_col = "rating"
-        ) + labs(x = "Movie", y = "User") +
-        theme(legend.position = "none")
-    })
+    plot <- observed.dt() %>% 
+      mutate(rating = sapply(value, transform_score_to_rating)) %>% 
+      vis_matrix(
+        row_col = "row", 
+        column_col = "col",
+        value_col = "rating"
+      ) + labs(x = "Movie", y = "User") +
+      theme(legend.position = "none")
+    
+    if(input$remove_text == "Yes") {
+      plot <- plot %>% 
+        remove_geom("GeomText")
+    }
+    
+    ggplotly({plot})
   })
   
   # Generating the simulations ---------------
@@ -78,9 +96,10 @@ server <- function(input, output, session) {
   # Visual for Generated Ratings 
   output$simulated_ratings_mean <- renderPlotly({
     req(simulations.dt())
+    req(input$remove_text)
     
-    ggplotly({
-      simulations.dt() %>% 
+    
+      plot <- simulations.dt() %>% 
         group_by(user_index, movie_index) %>% 
         summarise(mean_rating = mean(simulated_rating)) %>% 
         ungroup() %>% 
@@ -91,7 +110,15 @@ server <- function(input, output, session) {
           value_col = "mean_rating"
         ) + labs(x = "Movie", y = "User") +
         theme(legend.position = "none")
-    }, source = "full_matrix")
+      
+      if(input$remove_text == "Yes") {
+        plot <- plot %>% 
+          remove_geom("GeomText")
+      }
+      
+      ggplotly({
+        plot
+      }, source = "full_matrix")
   })
   
   # Detect clicks
