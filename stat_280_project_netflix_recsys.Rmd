@@ -75,7 +75,7 @@ movies %>% head
 ratings %>%
   group_by(movieId) %>%
   summarise(mean_rating=mean(rating), count=n()) %>%
-  filter(n >= 1000) %>% 
+  filter(count >= 1000) %>% 
   arrange(desc(mean_rating)) %>% 
   head(100) %>% 
   left_join(movies, by=c("movieId")) %>% 
