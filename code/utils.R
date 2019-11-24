@@ -86,10 +86,15 @@ transform_score_to_rating <- function(score) {
   sigmoid <- 1 /  (1 + exp(-score))
   
   case_when(
+    sigmoid <= 0.1 ~ 0.5,
     sigmoid <= 0.2 ~ 1,
+    sigmoid <= 0.3 ~ 1.5,
     sigmoid <= 0.4 ~ 2,
+    sigmoid <= 0.5 ~ 2.5,
     sigmoid <= 0.6 ~ 3,
+    sigmoid <= 0.7 ~ 3.5,
     sigmoid <= 0.8 ~ 4,
+    sigmoid <= 0.9 ~ 4.5,
     sigmoid <= 1 ~ 5
   )
 }
@@ -98,10 +103,15 @@ transform_rating_to_score <- function(rating) {
   #' Transforms ratings to score 
   
   rescaling <- case_when(
+    rating == 0.5 ~ 0.1,
     rating == 1 ~ 0.2,
+    rating == 1.5 ~ 0.3,
     rating == 2 ~ 0.4,
+    rating == 2.5 ~ 0.5,
     rating == 3 ~ 0.6,
+    rating == 3.5 ~ 0.7,
     rating == 4 ~ 0.8,
+    rating == 4.5 ~ 0.9,
     rating == 5 ~ 0.999999 # 1 returns Inf
   )
   
