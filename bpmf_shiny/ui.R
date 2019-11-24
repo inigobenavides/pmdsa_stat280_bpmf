@@ -70,6 +70,7 @@ ui <-
                 fluidRow(
                   column(
                     width = 12,
+                    p("Click the Simulated Mean Ratings block to view a density"),
                     plotOutput("rating_density")
                   )
                 )
