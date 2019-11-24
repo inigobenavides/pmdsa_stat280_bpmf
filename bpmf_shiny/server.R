@@ -21,16 +21,7 @@ server <- function(input, output, session) {
           value_col = "rating"
         ) + labs(x = "Movie", y = "User") +
         theme(legend.position = "none")
-    }, source = "full_matrix")
-  })
-  
-  # Detect clicks
-  selected_datapoint <- reactive({
-    event.data <- event_data("plotly_click", source = "full_matrix")
-    list(
-      user = length(unique(observed.dt()$row)) - as.numeric(event.data$pointNumber[[1]][1]),
-      movie = as.numeric(event.data$pointNumber[[1]][2]) + 1
-    )
+    })
   })
   
   # Generating the simulations ---------------
@@ -100,7 +91,16 @@ server <- function(input, output, session) {
         ) + labs(x = "Movie", y = "User") +
         theme(legend.position = "none")
     })
-  })
+  }, source = "full_matrix")
+  
+  # Detect clicks
+  selected_datapoint <- reactive({
+    event.data <- event_data("plotly_click", source = "full_matrix")
+    list(
+      user = length(unique(observed.dt()$row)) - as.numeric(event.data$pointNumber[[1]][1]),
+      movie = as.numeric(event.data$pointNumber[[1]][2]) + 1
+    )
+  })  
   
   # Visuals For density comparison -----------------
   output$rating_density <- renderPlot({
