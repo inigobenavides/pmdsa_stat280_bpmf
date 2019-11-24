@@ -97,13 +97,15 @@ transform_score_to_rating <- function(score) {
 transform_rating_to_score <- function(rating) {
   #' Transforms ratings to score 
   
-  case_when(
+  rescaling <- case_when(
     rating == 1 ~ 0.2,
     rating == 2 ~ 0.4,
     rating == 3 ~ 0.6,
     rating == 4 ~ 0.8,
-    rating == 5 ~ 1
+    rating == 5 ~ 0.999999 # 1 returns Inf
   )
+  
+  log(rescaling / (1 - rescaling))
 }
 
 compute_matrix_difference <- function(subtrahend, minuend,
