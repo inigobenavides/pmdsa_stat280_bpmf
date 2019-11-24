@@ -105,9 +105,9 @@ transform_score_to_rating <- function(score,
   
   case_when(
     sigmoid <= transform_rating_to_score(min, min = min, max = max,
-                              by = by) ~ 0.5,
+                              by = by) ~ min,
     sigmoid >= transform_rating_to_score(max, min = min, max = max,
-                                       by = by) ~ 5,
+                                       by = by) ~ max,
     TRUE ~ sigmoid * (max - by) + by
   )
 }
