@@ -166,18 +166,24 @@ server <- function(input, output, session) {
   
   output$difference_plot <- renderPlotly({
     req(difference_matrix())
+    req(input$remove_text)
     
-    ggplotly({
-      difference_matrix() %>% 
-        vis_matrix(
-          row_col = "row",
-          column_col = "col",
-          value_col = "difference"
-        ) + labs(x = "Movie", y = "User") +
-        theme(
-          legend.position = "none"
-        )
-    })
+    plot <- difference_matrix() %>% 
+      vis_matrix(
+        row_col = "row",
+        column_col = "col",
+        value_col = "difference"
+      ) + labs(x = "Movie", y = "User") +
+      theme(
+        legend.position = "none"
+      )
+    
+    if(input$remove_text == "Yes") {
+      plot <- plot %>% 
+        remove_geom("GeomText")
+    }
+    
+    ggplotly({plot})
   })
   
   # Summary ----------
