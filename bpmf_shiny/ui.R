@@ -20,17 +20,40 @@ ui <-
           column(
             width = 3,
             box(
+              title = "Input Panel",
               width = 12,
-              actionButton(
-                inputId = "generate_simulations",
-                label = "Generate Simulations"
+              hr(),
+              h3("Controls"),
+              div(
+                style = "text-align:center",
+                actionButton(
+                  inputId = "generate_simulations",
+                  label = "Generate Simulations"
+                ),
+                radioButtons(
+                  inputId = "remove_text",
+                  label = "Remove Text",
+                  choices = c("Yes", "No"),
+                  inline = TRUE,
+                  selected = "No"
+                )
               ),
-              radioButtons(
-                inputId = "remove_text",
-                label = "Remove Text",
-                choices = c("Yes", "No"),
-                inline = TRUE,
-                selected = "No"
+              hr(),
+              h3("Simulation Setup"),
+              sliderInput(
+                inputId = "hyperparameter_k",
+                label = "K hyperparameter",
+                min = 1, max = 10, value = 5
+              ),
+              numericInput(
+                inputId = "num_simulations",
+                label = "Number of Simulations",
+                value = 1500
+              ),
+              h3("Others"),
+              actionButton(
+                inputId = "debug",
+                label = "Debug"
               )
             )
           ),
@@ -42,14 +65,25 @@ ui <-
                 width = 12,
                 column(
                   width = 6,
-                  h3("Observed Ratings"),
-                  plotlyOutput("observed_ratings"),
-                  textOutput("testing")
+                  tabsetPanel(
+                    tabPanel(
+                      title = "Observed Ratings",
+                      plotlyOutput("observed_ratings")
+                    )
+                  )
                 ),
                 column(
                   width = 6,
-                  h3("Simulated Mean Ratings"),
-                  plotlyOutput("simulated_ratings_mean")
+                  tabsetPanel(
+                    tabPanel(
+                      title = "Mean Ratings Plot",
+                      plotlyOutput("simulated_ratings_mean")
+                    ),
+                    tabPanel(
+                      title = "Difference Plot",
+                      plotlyOutput("difference_plot")
+                    )
+                  )
                 )
               )
             ),
@@ -57,24 +91,23 @@ ui <-
             fluidRow(
               box(
                 width = 12,
-                title = "Density Comparisons",
+                title = "Summary Comparisons",
                 p("Green indicates observed, Blue indicates Posterior mean"),
                 fluidRow(
                   column(
                     width = 4,
+                    uiOutput("summary_ui")
+                  ),
+                  column(
+                    width = 8,
+                    p("Click the Simulated Mean Ratings block to view a density"),
                     radioButtons(
                       inputId = "density_type",
                       choices = c("Rating", "Score"),
-                      selected = "Score",
+                      selected = "Rating",
                       label = "Select for Distribution of Rating or Score",
                       inline = TRUE
-                    )
-                  )
-                ),
-                fluidRow(
-                  column(
-                    width = 12,
-                    p("Click the Simulated Mean Ratings block to view a density"),
+                    ),
                     plotOutput("rating_density")
                   )
                 )
