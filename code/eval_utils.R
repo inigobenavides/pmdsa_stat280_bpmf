@@ -1,6 +1,6 @@
 # eval_utils.R
 # Functions to evaluate recommender system models
-# Implementations of RMSE, precision and recall curves
+# Implementations of RMSE, train_test_split
 
 train_test_split <- function(R, train_size=0.8) {
   # Temporally splits ratings data by user
@@ -24,100 +24,6 @@ train_test_split <- function(R, train_size=0.8) {
   return(result)
 }
 
-
-
-set.seed(1)
-# Generate sampled ratings
-sampled_ratings <- sample_ratings_top_users(ratings, 15, 15, max_num_users_per_movie = 10, min_num_users_per_movie = 6) %>%
-  mutate(value=sapply(value, transform_score_to_rating)) %>%
-  rename(userId=row,
-         movieId=col,
-         rating=value)
-
-
-# Split sampled ratings
-split_sampled_ratings <- train_test_split(sampled_ratings)
-
-sampled_ratings_train <- split_sampled_ratings$train
-sampled_ratings_test <- split_sampled_ratings$test
-
-# Map sampled ratings train
-sampled_ratings_user_key_train <- sampled_ratings_train %>%
-  select(userId) %>%
-  distinct %>%
-  mutate(user_key=row_number())
-
-sampled_ratings_movie_key_train <- sampled_ratings_train %>%
-  select(movieId) %>%
-  distinct %>%
-  mutate(movie_key=row_number())
-
-sampled_ratings_mapped_train <- sampled_ratings_train %>%
-  left_join(sampled_ratings_user_key_train, by="userId") %>% 
-  left_join(sampled_ratings_movie_key_train, by="movieId") %>% 
-  select(user_key, movie_key, rating)
-
-# Run training set through BPMF
-# Implement Gibbs sampler
-n_replications <- 1000
-
-# Define initial parameters
-k_estimate <- 5
-alpha <- 2
-mu_0 <- rep(0, k_estimate)
-beta_0 <- 1
-nu_0 <- 1
-W_0 <- diag(k_estimate)
-
-sampled_ratings_matrix_train <- sampled_ratings_mapped_train %>%
-  mutate(rating=sapply(rating, transform_rating_to_score)) %>% 
-  select(user_key, movie_key, rating) %>%
-  as.matrix
-
-n_users <- sampled_ratings_train %>%
-  summarise(n_users=n_distinct(userId)) %>%
-  as.numeric()
-
-n_movies <- sampled_ratings_train %>%
-  summarise(n_movies=n_distinct(movieId)) %>%
-  as.numeric()
-
-# Run replications and models
-netflix_bpmf_gibbs_results_train <- BPMF_Gibbs_Sampler(
-  sampled_ratings_matrix_train, 
-  k_estimate, 
-  n_replications, 
-  n_users, 
-  n_movies, 
-  mu_0, beta_0, nu_0, W_0, alpha
-)
-
-# PMF model
-netflix_pmf_gibbs_results_train <- PMF_Gibbs_Sampler(
-  sampled_ratings_matrix_train,
-  k_estimate,
-  n_replications,
-  n_users,
-  n_movies,
-  sigma_U = 1,
-  sigma_V = 1,
-  sigma = 1
-)
-
-# SVD model
-svd_train <- svd_solver(
-  sampled_ratings_train,
-  k_estimate,
-  n_users,
-  n_movies) %>%
-  matrix_to_tidydf() %>% 
-  mutate(value=sapply(value, transform_score_to_rating)) %>% 
-  left_join(sampled_ratings_user_key_train, by=c("row" = "user_key")) %>% 
-  left_join(sampled_ratings_movie_key_train, by=c("col" = "movie_key")) %>% 
-  select(userId, movieId, value) %>% 
-  rename(rating=value)
-
-# Compute posterior mean of replications Rs and convert to tidy format
 compute_mean_posterior_ratings_matrix <- function(gibbs_result, burn_in, n_replications) {
   # Computes posterior mean of replications from gibbs_result
   #' @param gibbs_result: return object from Gibbs Sampler
@@ -139,30 +45,6 @@ compute_mean_posterior_ratings_matrix <- function(gibbs_result, burn_in, n_repli
   return(posterior_means_matrix)
 }
 
-netflix_bpmf_gibbs_posterior_ratings <- compute_mean_posterior_ratings_matrix(
-  netflix_bpmf_gibbs_results_train,
-  burn_in = 500,
-  n_replications = n_replications
-) %>% mutate(value=sapply(value, transform_score_to_rating)) %>%
-  as.data.frame %>% 
-  left_join(sampled_ratings_user_key_train, by=c("row" = "user_key")) %>% 
-  left_join(sampled_ratings_movie_key_train, by=c("col" = "movie_key")) %>% 
-  select(userId, movieId, value) %>% 
-  rename(rating=value)
-  
-
-netflix_pmf_gibbs_posterior_ratings <- compute_mean_posterior_ratings_matrix(
-  netflix_pmf_gibbs_results_train,
-  burn_in = 500,
-  n_replications = n_replications
-) %>% mutate(value=sapply(value, transform_score_to_rating)) %>%
-  as.data.frame %>% 
-  left_join(sampled_ratings_user_key_train, by=c("row" = "user_key")) %>% 
-  left_join(sampled_ratings_movie_key_train, by=c("col" = "movie_key")) %>% 
-  select(userId, movieId, value) %>% 
-  rename(rating=value)
-
-# Compute RMSE
 compute_RMSE <- function(R1, R2) {
   # Computes RMSE for two ratings matrices in tidy format
   #' @param R1: first ratings matrix
@@ -174,6 +56,136 @@ compute_RMSE <- function(R1, R2) {
     as.numeric
 }
 
-compute_RMSE(svd_train, sampled_ratings_test)
-compute_RMSE(netflix_pmf_gibbs_posterior_ratings, sampled_ratings_test)
-compute_RMSE(netflix_bpmf_gibbs_posterior_ratings, sampled_ratings_test)
+model_evaluation_pipeline <- function(R, k) {
+  # Pipeline to run model evaluation and comparisons
+  # given sampled ratings and given k
+  #' @param R: sampled ratings matrix in tidy format
+  #' @param k: number of latent factors to pass to BPMF, PMF, and SVD
+  #' @param model_eval: dataframe of RMSE by model
+  
+  logger::log_info(paste("Running model evaluation pipeline, k =", k))
+  
+  # Split sampled ratings
+  split_sampled_ratings <- train_test_split(R)
+  
+  sampled_ratings_train <- split_sampled_ratings$train
+  sampled_ratings_test <- split_sampled_ratings$test
+  
+  # Map sampled ratings train
+  sampled_ratings_user_key_train <- sampled_ratings_train %>%
+    select(userId) %>%
+    distinct %>%
+    mutate(user_key=row_number())
+  
+  sampled_ratings_movie_key_train <- sampled_ratings_train %>%
+    select(movieId) %>%
+    distinct %>%
+    mutate(movie_key=row_number())
+  
+  sampled_ratings_mapped_train <- sampled_ratings_train %>%
+    left_join(sampled_ratings_user_key_train, by="userId") %>% 
+    left_join(sampled_ratings_movie_key_train, by="movieId") %>% 
+    select(user_key, movie_key, rating)
+  
+  sampled_ratings_matrix_train <- sampled_ratings_mapped_train %>%
+    mutate(rating=sapply(rating, transform_rating_to_score)) %>% 
+    select(user_key, movie_key, rating) %>%
+    as.matrix
+  
+  n_users <- sampled_ratings_train %>%
+    summarise(n_users=n_distinct(userId)) %>%
+    as.numeric()
+  
+  n_movies <- sampled_ratings_train %>%
+    summarise(n_movies=n_distinct(movieId)) %>%
+    as.numeric()
+  
+  # Define initial parameters
+  n_replications <- 1000
+  alpha <- 2
+  mu_0 <- rep(0, k)
+  beta_0 <- 1
+  nu_0 <- 1
+  W_0 <- diag(k)
+  
+  # Run BPMF
+  logger::log_info("Running BPMF...")
+  netflix_bpmf_gibbs_results_train <- BPMF_Gibbs_Sampler(
+    sampled_ratings_matrix_train, 
+    k, 
+    n_replications, 
+    n_users, 
+    n_movies, 
+    mu_0, beta_0, nu_0, W_0, alpha
+  )
+  
+  # Run PMF
+  logger::log_info("Running PMF...")
+  netflix_pmf_gibbs_results_train <- PMF_Gibbs_Sampler(
+    sampled_ratings_matrix_train,
+    k,
+    n_replications,
+    n_users,
+    n_movies,
+    sigma_U = 1,
+    sigma_V = 1,
+    sigma = 1
+  )
+  
+  # SVD model
+  logger::log_info("Running SVD...")
+  svd_train <- svd_solver(
+    sampled_ratings_train,
+    k_estimate,
+    n_users,
+    n_movies) %>%
+    matrix_to_tidydf() %>% 
+    mutate(value=sapply(value, transform_score_to_rating)) %>% 
+    left_join(sampled_ratings_user_key_train, by=c("row" = "user_key")) %>% 
+    left_join(sampled_ratings_movie_key_train, by=c("col" = "movie_key")) %>% 
+    select(userId, movieId, value) %>% 
+    rename(rating=value)
+  
+  # Compute posterior means for BPMF replications
+  logger::log_info("Computing BPMF posterior means...")
+  netflix_bpmf_gibbs_posterior_ratings <- compute_mean_posterior_ratings_matrix(
+    netflix_bpmf_gibbs_results_train,
+    burn_in = 500,
+    n_replications = n_replications
+  ) %>% mutate(value=sapply(value, transform_score_to_rating)) %>%
+    as.data.frame %>% 
+    left_join(sampled_ratings_user_key_train, by=c("row" = "user_key")) %>% 
+    left_join(sampled_ratings_movie_key_train, by=c("col" = "movie_key")) %>% 
+    select(userId, movieId, value) %>% 
+    rename(rating=value)
+  
+  # Compute posterior means for PMF replications
+  logger::log_info("Computing PMF posterior means...")
+  netflix_pmf_gibbs_posterior_ratings <- compute_mean_posterior_ratings_matrix(
+    netflix_pmf_gibbs_results_train,
+    burn_in = 500,
+    n_replications = n_replications
+  ) %>% mutate(value=sapply(value, transform_score_to_rating)) %>%
+    as.data.frame %>% 
+    left_join(sampled_ratings_user_key_train, by=c("row" = "user_key")) %>% 
+    left_join(sampled_ratings_movie_key_train, by=c("col" = "movie_key")) %>% 
+    select(userId, movieId, value) %>% 
+    rename(rating=value)
+  
+  
+  rmse_svd_train <- compute_RMSE(svd_train, sampled_ratings_train)
+  rmse_pmf_train <- compute_RMSE(netflix_pmf_gibbs_posterior_ratings, sampled_ratings_train)
+  rmse_bpmf_train <- compute_RMSE(netflix_bpmf_gibbs_posterior_ratings, sampled_ratings_train)
+  rmse_svd_test <- compute_RMSE(svd_train, sampled_ratings_test)
+  rmse_pmf_test <- compute_RMSE(netflix_pmf_gibbs_posterior_ratings, sampled_ratings_test)
+  rmse_bpmf_test <- compute_RMSE(netflix_bpmf_gibbs_posterior_ratings, sampled_ratings_test)
+  
+  model_results <- data.frame(model=c("SVD", "PMF", "BPMF"),
+                              rmse_train=c(rmse_svd_train, rmse_pmf_train, rmse_bpmf_train),
+                              rmse_test=c(rmse_svd_test, rmse_pmf_test, rmse_bpmf_test))
+  logger::log_info("Done")
+  return(model_results)
+}
+
+
+

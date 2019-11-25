@@ -10,6 +10,6 @@ This project implements Salakhutdinov and Mnih's [*Bayesian Probabilistic Matrix
 
 1) Create `dummy_data` folder in `bpmf_shiny` folder
 2) Open project of rmd, run the chunk for simulations
-2.5) Run `bpmf_shiny/shiny_sandbox.R` to generate data for netflix sample
-3) Open project of Shiny
-4) Run Shiny App
+3) Run `bpmf_shiny/shiny_sandbox.R` to generate data for netflix sample
+4) Open project of Shiny
+5) Run Shiny App
