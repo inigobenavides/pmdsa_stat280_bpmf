@@ -18,6 +18,10 @@ remove_geom <- function(ggplot2_object, geom_type) {
 
 server <- function(input, output, session) {
   
+  observeEvent(input$debug, {
+    browser()
+  })
+  
   # Read Files 
   observed.dt <- reactive({
     # readRDS("dummy_data/synthetic_simulations_sparse.rds")
@@ -46,13 +50,15 @@ server <- function(input, output, session) {
   # Generating the simulations ---------------
   simulations.dt <- eventReactive(input$generate_simulations, {
     req(observed.dt())
+    req(input$num_simulations)
+    req(input$hyperparameter_k)
     
     withProgress(message = "Starting Generation", {
       # Implement Gibbs sampler
-      n_replications <- 1000
+      n_replications <- input$num_simulations
       
       # Define initial parameters
-      k_estimate <- 5
+      k_estimate <- input$hyperparameter_k
       alpha <- 10
       mu_0 <- rep(0, k_estimate)
       beta_0 <- 1
@@ -98,7 +104,6 @@ server <- function(input, output, session) {
     req(simulations.dt())
     req(input$remove_text)
     
-    
       plot <- simulations.dt() %>% 
         group_by(user_index, movie_index) %>% 
         summarise(mean_rating = mean(simulated_rating)) %>% 
@@ -129,6 +134,39 @@ server <- function(input, output, session) {
       movie = as.numeric(event.data$pointNumber[[1]][2]) + 1
     )
   })  
+  
+  # Visual for DIFFERENCE
+  
+  output$difference_plot <- renderPlotly({
+    req(simulations.dt())
+    req(observed.dt())
+    
+    ggplotly({
+      compute_matrix_difference(
+        subtrahend = observed.dt() %>% 
+          mutate(value = sapply(value, transform_score_to_rating)),
+        minuend =  simulations.dt() %>% 
+          group_by(user_index, movie_index) %>% 
+          summarise(mean_rating = mean(simulated_rating)) %>% 
+          ungroup() %>% 
+          mutate(mean_rating = sapply(mean_rating, transform_score_to_rating)),
+        subtrahend_row_col = "row",
+        subtrahend_column_col = "col",
+        subtrahend_value_col = "value",
+        minuend_row_col = "user_index",
+        minuend_column_col = "movie_index",
+        minuend_value_col = "mean_rating"
+      ) %>% 
+        vis_matrix(
+          row_col = "row",
+          column_col = "col",
+          value_col = "difference"
+        ) + labs(x = "Movie", y = "User") +
+        theme(
+          legend.position = "none"
+        )
+    })
+  })
   
   # Visuals For density comparison -----------------
   output$rating_density <- renderPlot({
