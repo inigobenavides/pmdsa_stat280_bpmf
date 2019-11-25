@@ -1,14 +1,20 @@
 # svd.R
 # Functions that implements SVD
 
-svd_solver <- function(R, U, V) {
+svd_solver <- function(R, k, n_users, n_movies) {
   # Gradient descent on error function
   # with respect to U and V
-  #' @param R: Rating matrix in tidy format
-  #' @param U: Matrix[n_users x k]
-  #' @param V: Matrix[n_movies x k]
+  #' @param R: Rating matrix in tidy format (mapped)
+  #' @param k: number of latent variables
+  #' @param n_users: number of users 
+  #' @param n_movies: number of movies
   #' @return R_estimate: Rating estimate Matrix in tidy format
-
+ 
+  # Initialize U and V
+  UV_init <- initialize_UV(k, n_users, n_movies)
+  U <- UV_init[[1]]
+  V <- UV_init[[2]]
+  
   # Flatten U_init and V_init to UV_vec_flat
   UV_vec_flat <- c((U %>% as.vector()), (V %>% as.vector()))
   n_users <- nrow(U)
@@ -22,10 +28,10 @@ svd_solver <- function(R, U, V) {
     V_init <- matrix(x[(n_users*k_estimate+1):(n_users*k_estimate + k_estimate*n_movies)], nrow=n_movies)
     
     # Compute observed square error
-    R_estimate <- (U_init %*% t(V_init)) %>% matrix_to_tidydf()
+    R_estimate <- (U_init %*% t(V_init)) %>% matrix_to_tidydf() %>% rename(userId=row, movieId=col, rating=value)
     R_error <- R %>%
-      inner_join(R_estimate, by = c("row", "col")) %>%
-      mutate(square_error=(value.x - value.y)^2)
+      inner_join(R_estimate, by = c("userId", "movieId")) %>%
+      mutate(square_error=(rating.x - rating.y)^2)
     
     sum_square_error <- R_error$square_error %>% sum
     return(sum_square_error)
