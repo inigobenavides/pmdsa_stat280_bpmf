@@ -48,7 +48,7 @@ ui <-
               numericInput(
                 inputId = "num_simulations",
                 label = "Number of Simulations",
-                value = 1000
+                value = 1500
               ),
               h3("Others"),
               actionButton(
@@ -91,24 +91,23 @@ ui <-
             fluidRow(
               box(
                 width = 12,
-                title = "Density Comparisons",
+                title = "Summary Comparisons",
                 p("Green indicates observed, Blue indicates Posterior mean"),
                 fluidRow(
                   column(
                     width = 4,
+                    uiOutput("summary_ui")
+                  ),
+                  column(
+                    width = 8,
+                    p("Click the Simulated Mean Ratings block to view a density"),
                     radioButtons(
                       inputId = "density_type",
                       choices = c("Rating", "Score"),
                       selected = "Rating",
                       label = "Select for Distribution of Rating or Score",
                       inline = TRUE
-                    )
-                  )
-                ),
-                fluidRow(
-                  column(
-                    width = 12,
-                    p("Click the Simulated Mean Ratings block to view a density"),
+                    ),
                     plotOutput("rating_density")
                   )
                 )
