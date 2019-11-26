@@ -15,6 +15,7 @@ library("glue")
 library("purrr")
 library("rlang")
 library("magrittr")
+library("logger")
 walk(list.files("code", full.names = TRUE), .f = function(x) {source(x)})
 ```
 
@@ -401,4 +402,53 @@ sampled_ratings_mapped %>%
   filter(movie_key == 8)
 ```
 
+## Model Comparisons and Evaluations
 
+In this section, we compare the predictive performance of BPMF against Probabilistic Matrix Factorization and SVD.
+
+```{r}
+# Generate sampled ratings
+sampled_ratings <- sample_ratings_top_users(ratings,
+                                            n_users=15,
+                                            n_movies=15,
+                                            max_num_users_per_movie = 10,
+                                            min_num_users_per_movie = 6) %>%
+  mutate(value=sapply(value, transform_score_to_rating)) %>%
+  rename(userId=row,
+         movieId=col,
+         rating=value)
+```
+```{r}
+# Evaluate models with k from 2 to 15
+ks <- 2:15
+model_comparisons <- ks %>%
+  Map(function(x) {
+    model_evaluation_pipeline(sampled_ratings, x) %>% 
+      mutate(k=x) %>%
+      mutate(rmse_train=rmse_train) %>%
+      mutate(rmse_test=rmse_test)}, .) %>%
+  Reduce(function(x, y) {rbind(x, y)}, .)
+
+# Plot test RMSE vs. k by model
+model_comparisons %>% 
+  ggplot(aes(x=k, y=rmse_test, color=model)) + geom_line() + theme_minimal()
+
+```
+
+```{r}
+model_comparisons %>%
+  ggplot(aes(x=k, y=rmse_test, color=model)) +
+  geom_line() +
+  geom_point() +
+  theme_minimal() +
+  scale_x_continuous(breaks=2:15)
+```
+
+```{r}
+model_comparisons %>%
+  ggplot(aes(x=k, y=rmse_train, color=model)) +
+  geom_line() +
+  geom_point() + 
+  theme_minimal() +
+  scale_x_continuous(breaks=2:15)
+```
