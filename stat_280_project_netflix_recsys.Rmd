@@ -434,7 +434,21 @@ model_comparisons %>%
   ggplot(aes(x=k, y=rmse_test, color=model)) + geom_line() + theme_minimal()
 
 ```
+
 ```{r}
-model_comparisons %>% ggplot(aes(x=k, y=rmse_test, color=model)) + geom_line() + theme_minimal()
+model_comparisons %>%
+  ggplot(aes(x=k, y=rmse_test, color=model)) +
+  geom_line() +
+  geom_point() +
+  theme_minimal() +
+  scale_x_continuous(breaks=2:15)
 ```
 
+```{r}
+model_comparisons %>%
+  ggplot(aes(x=k, y=rmse_train, color=model)) +
+  geom_line() +
+  geom_point() + 
+  theme_minimal() +
+  scale_x_continuous(breaks=2:15)
+```
