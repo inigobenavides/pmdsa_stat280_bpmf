@@ -78,14 +78,14 @@ sample_ratings_top_users <- function(R, n_users, n_movies,
   R %>% 
     filter(userId %in% top_users) %>% 
     filter(movieId %in% sample_movies) %>% 
-    mutate(userId = as.numeric(factor(userId, labels = seq(1:n_users)))) %>% 
-    mutate(movieId = as.numeric(factor(movieId, labels = seq(1:n_movies)))) %>% 
+    # mutate(userId = as.numeric(factor(userId, labels = seq(1:n_users)))) %>% 
+    # mutate(movieId = as.numeric(factor(movieId, labels = seq(1:n_movies)))) %>% 
     rename(
       row = userId,
       col = movieId,
       value = rating
     ) %>% 
-    mutate(value = sapply(value, transform_rating_to_score)) %>% 
+    # mutate(value = sapply(value, transform_rating_to_score)) %>% 
     as.data.frame()
 }
 
